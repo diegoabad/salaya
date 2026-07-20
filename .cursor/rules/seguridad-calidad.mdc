@@ -1,0 +1,29 @@
+---
+description: Auth, secrets, validación, rate limit y calidad del monorepo
+alwaysApply: true
+---
+
+# Seguridad y calidad
+
+## Seguridad
+
+- Auth server-side (Auth.js / Lucia). `tenantId` sale de la **sesión**, jamás del body/query.
+- Secrets solo en env. Nada de tokens en el repo. `NEXT_PUBLIC_*` solo para valores realmente públicos.
+- Rate limiting en endpoints públicos y en el bot.
+- Todo input externo: Zod + escape. Drizzle parametriza — no concatenar SQL.
+- Tokens MP y credenciales wpp **cifrados** en DB.
+- Webhooks: firma (`x-signature` / `X-Hub-Signature-256`) antes de confiar en el payload.
+
+## Packages compartidos
+
+- `packages/core`: reglas de negocio puras. Sin Express, sin Next, sin Baileys.
+- `packages/shared`: schemas Zod, constantes, helpers fecha/dinero. Una definición para front, actions y bot.
+- Consumo interno: `"@repo/db": "workspace:*"` (no se publican).
+
+## Calidad
+
+- TypeScript `strict: true` en todo el monorepo (`tsconfig.base.json`).
+- ESLint + Prettier compartidos en raíz.
+- Tests donde duelen: unit de `core` (disponibilidad, precios, cancelaciones) + E2E mínimo reservar→señar→confirmar.
+- CI: typecheck + lint + tests en cada PR.
+- Commits: `feat:`, `fix:` (convención corta).

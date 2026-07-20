@@ -1,0 +1,39 @@
+---
+description: Drizzle, multitenancy, transacciones y conexiones Neon
+globs: "{packages/db/**/*,**/schema.ts,**/drizzle/**/*}"
+alwaysApply: false
+---
+
+# Base de datos (Drizzle + Neon)
+
+## Schema
+
+- Schema único en `packages/db`. Tipos con `InferSelectModel` — no tipar a mano lo que Drizzle ya sabe.
+- Migraciones con `drizzle-kit`, versionadas en git. Nunca editar schema en prod a mano.
+- Queries centralizadas en `packages/db/queries`. No Drizzle suelto en componentes/controllers.
+
+## Multitenancy (inquebrantable)
+
+- Toda tabla de datos lleva `tenant_id`. Toda query filtra por `tenant_id`.
+- Queries con `tenantId` como **primer argumento obligatorio**:
+
+```ts
+export function reservasDelDia(tenantId: string, fecha: Date) {
+  return db.query.reservas.findMany({
+    where: and(eq(reservas.tenantId, tenantId), eq(reservas.fecha, fecha)),
+  });
+}
+```
+
+- Índices compuestos que arrancan en `tenant_id`: `(tenant_id, fecha)`, `(tenant_id, sala_id, fecha)`.
+
+## Queries y concurrencia
+
+- Evitá N+1: `with` / joins. Paginación siempre. `columns:` en listados grandes.
+- Crear reserva = verificar disponibilidad + insert en la **misma transacción**.
+- Blindaje DB: unique/exclusión sobre `(tenant_id, sala_id, franja)` — última línea de defensa.
+
+## Conexiones
+
+- Vercel/serverless: driver HTTP Neon o pooler. Bot (proceso largo): pool `pg` con `max` acotado.
+- Timeouts de query configurados.

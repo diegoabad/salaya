@@ -1,0 +1,33 @@
+---
+description: Estructura del monorepo, dependencias y dónde vive la lógica
+alwaysApply: true
+---
+
+# Arquitectura del monorepo
+
+```
+/apps
+  /app          → Next.js (directorio público + panel admin)
+  /api          → Node/Express (bot, webhooks Meta/MP, scheduler)
+/packages
+  /db /core /shared → schema, dominio, tipos compartidos
+```
+
+## Dependencias (unidireccionales)
+
+- `apps/*` pueden importar de `packages/*`. Nunca al revés.
+- `apps/app` nunca importa de `apps/api` ni viceversa. Si hay que compartir → bajar a `packages/`.
+- Lógica de negocio (disponibilidad, precios, señas, cancelaciones) vive en `packages/core`, no en un controller ni en un componente.
+
+## Por qué
+
+La regla "¿está libre la Sala B el jueves 20hs?" debe existir **una sola vez**. Duplicarla entre panel y bot = doble-booking.
+
+## Checklist antes de cada feature
+
+- [ ] ¿La lógica nueva vive en core o quedó enterrada en componente/controller?
+- [ ] ¿Toda query filtra por `tenant_id` y tiene índice que lo soporte?
+- [ ] ¿La mutación valida con Zod y verifica auth/tenant?
+- [ ] ¿El componente va en `ui/` (genérico) o `features/` (dominio)?
+- [ ] ¿Webhook idempotente y responde 200 rápido?
+- [ ] ¿Ningún secreto en texto plano?

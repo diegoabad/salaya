@@ -1,0 +1,14 @@
+{
+  "name": "musica",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:app": "pnpm --filter app dev",
+    "dev:api": "pnpm --filter api dev"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.7.0"
+}

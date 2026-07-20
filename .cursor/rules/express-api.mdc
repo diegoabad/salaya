@@ -1,0 +1,56 @@
+---
+description: Convenciones Node/Express para el backend en apps/api
+globs: apps/api/**/*
+alwaysApply: false
+---
+
+# Express (`apps/api`)
+
+## Capas
+
+```
+src/
+  routes/        → endpoints, cero lógica
+  controllers/   → parsea request, llama servicio, arma response
+  services/      → orquestación del bot (sesiones, colas)
+  channels/      → adapters Baileys / Cloud API (misma interfaz)
+  webhooks/      → Meta, Mercado Pago
+  jobs/          → recordatorios, limpieza
+  middlewares/   → auth, validación, errores, logging
+  config/        → env tipado (Zod al boot)
+```
+
+La lógica de **reservas** no vive acá → `packages/core`. El bot traduce mensajes a llamadas de core.
+
+## Canal (abstracción clave)
+
+```ts
+interface Channel {
+  sendText(to: string, text: string): Promise<void>;
+  sendButtons(to: string, text: string, buttons: Button[]): Promise<void>;
+  onMessage(handler: (msg: IncomingMessage) => Promise<void>): void;
+}
+```
+
+Baileys y Cloud API implementan lo mismo. El motor no se entera del canal del tenant.
+
+## Errores y validación
+
+- Error handler centralizado (último middleware). Controllers tiran, no hacen try/catch decorativo.
+- Errores de dominio (`SlotOcupadoError`) → status/mensaje. Lo inesperado → 500 + log, sin filtrar detalles al cliente.
+- Express 5 o `asyncHandler`: ninguna promesa sin catch.
+- Zod en el borde (HTTP/webhook). Adentro, tipos confiables.
+- Webhooks Meta/MP: verificar firma **antes** de procesar.
+
+## Webhooks
+
+1. Verificar firma → 2. persistir/encolar → 3. responder **200** rápido.
+4. Procesar pesado después (fuera del request).
+5. Idempotencia: guardar ID de evento y descartar duplicados.
+
+## Ops
+
+- Env validado con Zod al arrancar (`config/env.ts`).
+- Logging estructurado (pino) con `tenantId`, `reservaId`, correlationId. Sin `console.log` en prod.
+- Baileys: sesión por tenant, reconexión + backoff, credenciales en DB.
+- Graceful shutdown (SIGTERM). `/health` verifica DB y sesiones.

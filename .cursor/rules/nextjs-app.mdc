@@ -1,0 +1,57 @@
+---
+description: Convenciones Next.js App Router para el frontend en apps/app
+globs: apps/app/**/*
+alwaysApply: false
+---
+
+# Next.js (`apps/app`)
+
+## Server Components por defecto
+
+- Todo es Server Component salvo interactividad (estado, eventos, hooks de browser) → recién ahí `"use client"`.
+- Empujá `"use client"` lo más abajo posible: página server, botón client. No marques páginas enteras.
+- Lecturas: el Server Component consulta DB directo (vía `packages/db`). No crees un endpoint solo para renderizar.
+
+## Data fetching
+
+- Directorio público: ISR (`revalidate` + `revalidatePath` al editar).
+- Panel admin: dinámico (`force-dynamic` o cookies/headers).
+- Una ruta es estática/ISR **o** dinámica. No mezclar.
+- `generateStaticParams` para fichas de salas en build.
+
+## Mutaciones
+
+- Preferí **Server Actions** sobre route handlers en el panel.
+- Toda action: 1) auth 2) Zod 3) assertTenant 4) llamar a `core`.
+- Route handlers solo para webhooks, terceros, o cuando una action no aplica.
+
+## Rutas
+
+```
+app/
+  (public)/salas/[slug]/
+  (admin)/panel/{agenda,caja,config}/
+  api/webhooks/...
+```
+
+- Auth guard en `layout.tsx` del grupo `(admin)` o middleware, no en cada página.
+- `error.tsx`, `not-found.tsx`, `loading.tsx` / Suspense por segmento.
+
+## Componentes
+
+```
+components/
+  ui/        → primitivos sin dominio (shadcn)
+  features/  → dominio (ReservaCard, CalendarioSala)
+  layouts/   → Shell, Header, Sidebar
+```
+
+- Composición > 15 props de configuración.
+- Un feature usado en una sola página vive junto a la página (`_components/`). Se promueve a `features/` en la 2ª repetición.
+- Componentes no fetchean ni mutan: props o actions/hooks inyectados.
+
+## Estado y forms
+
+- Server state en el server; UI local con `useState`. Zustand solo si hace falta de verdad.
+- Forms: `react-hook-form` + `zodResolver` con el **mismo** schema Zod que la Server Action (`packages/shared`).
+- Tailwind + tokens + `cva` para variantes.
