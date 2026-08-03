@@ -7,27 +7,28 @@ alwaysApply: true
 
 ```
 /apps
-  /app          → Next.js (directorio público + panel admin)
-  /api          → Node/Express (bot, webhooks Meta/MP, scheduler)
+  /app   → Next.js (público + panel) + Auth.js
+  /api   → Express (REST, webhooks MP, jobs) — writer de negocio
 /packages
-  /db /core /shared → schema, dominio, tipos compartidos
+  /db /core /shared
 ```
 
-## Dependencias (unidireccionales)
+## Dependencias
 
-- `apps/*` pueden importar de `packages/*`. Nunca al revés.
-- `apps/app` nunca importa de `apps/api` ni viceversa. Si hay que compartir → bajar a `packages/`.
-- Lógica de negocio (disponibilidad, precios, señas, cancelaciones) vive en `packages/core`, no en un controller ni en un componente.
+- `apps/*` → `packages/*`. Nunca al revés.
+- `apps/app` ↛ `apps/api` (código). Compartir → `packages/`.
+- Queries solo en `packages/db`. Dominio en `core`.
+- Escrituras de negocio: `apps/api`. Auth.js puede escribir tablas de auth.
 
-## Por qué
+## Multi-tenancy
 
-La regla "¿está libre la Sala B el jueves 20hs?" debe existir **una sola vez**. Duplicarla entre panel y bot = doble-booking.
+Toda tabla de datos lleva `tenant_id`. Toda query filtra por él. El `tenantId` sale de la **sesión**, nunca del body/URL.
 
-## Checklist antes de cada feature
+## Checklist
 
-- [ ] ¿La lógica nueva vive en core o quedó enterrada en componente/controller?
-- [ ] ¿Toda query filtra por `tenant_id` y tiene índice que lo soporte?
-- [ ] ¿La mutación valida con Zod y verifica auth/tenant?
-- [ ] ¿El componente va en `ui/` (genérico) o `features/` (dominio)?
-- [ ] ¿Webhook idempotente y responde 200 rápido?
-- [ ] ¿Ningún secreto en texto plano?
+- [ ] ¿Lógica en `core`?
+- [ ] ¿Query con `tenant_id` + índice?
+- [ ] ¿Zod + auth/tenant en el borde?
+- [ ] ¿Mutación de negocio vía API?
+- [ ] ¿Webhook idempotente?
+- [ ] ¿Secretos fuera del repo / cifrados?

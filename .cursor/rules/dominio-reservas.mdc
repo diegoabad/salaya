@@ -1,0 +1,35 @@
+---
+description: Reglas de negocio de reservas, precios, señas, caja y asistencia
+alwaysApply: true
+---
+
+# Dominio — reservas
+
+## Disponibilidad
+
+Horario de atención de sede (o **horario especial** del día si existe), sin solape con reservas activas/holds ni bloqueos, stock de adicionales OK.
+Duración efectiva = override de sala ?? política de sede.
+Disponibilidad + insert en la **misma transacción** + exclusion constraint Postgres.
+
+## Hold / precios / seña
+
+Hold con vencimiento. Precio congelado. Un solo motor de reglas (más específica gana) para sala y adicionales.
+Descuentos del dueño: **continuo** (se repite por día/franja) o **puntual/relámpago** (vigencia `fecha_desde`–`fecha_hasta`). Puntual gana a continuo.
+Seña: nunca / siempre / reincidentes. MP marketplace, tokens cifrados, webhook idempotente.
+
+## Caja
+
+Cada cobro: **medio** (efectivo | transferencia | mercadopago | tarjeta) + **concepto** (seña | saldo | …).
+Caso típico: seña por MP + saldo en efectivo = 2 movimientos de la misma reserva.
+
+## Asistencia (cierre)
+
+Reserva pasada: dueño marca **asistió** → `completada` (habilita cobrar saldo) o **no vino** → `ausente` + `no_show_count++`.
+
+## Cancelación
+
+Ventana + destino seña. Reprogramar traslada seña. Quién canceló: cliente | dueño | sistema.
+
+## Roadmap (no implementar aún)
+
+Fijos/recurrentes, extensión de turno, reportes, lista de espera, egresos de caja.

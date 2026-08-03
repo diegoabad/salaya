@@ -31,7 +31,7 @@ export function reservasDelDia(tenantId: string, fecha: Date) {
 
 - Evitá N+1: `with` / joins. Paginación siempre. `columns:` en listados grandes.
 - Crear reserva = verificar disponibilidad + insert en la **misma transacción**.
-- Blindaje DB: unique/exclusión sobre `(tenant_id, sala_id, franja)` — última línea de defensa.
+- Blindaje DB: migración `0001_reservas_no_overlap` — `EXCLUDE USING gist` sobre `(sala_id, tstzrange)` para estados activos. No quitarla.
 
 ## Conexiones
 

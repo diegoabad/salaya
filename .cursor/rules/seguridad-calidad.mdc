@@ -1,5 +1,5 @@
 ---
-description: Auth, secrets, validación, rate limit y calidad del monorepo
+description: Auth, secrets, validación y calidad del monorepo
 alwaysApply: true
 ---
 
@@ -7,23 +7,22 @@ alwaysApply: true
 
 ## Seguridad
 
-- Auth server-side (Auth.js / Lucia). `tenantId` sale de la **sesión**, jamás del body/query.
-- Secrets solo en env. Nada de tokens en el repo. `NEXT_PUBLIC_*` solo para valores realmente públicos.
-- Rate limiting en endpoints públicos y en el bot.
-- Todo input externo: Zod + escape. Drizzle parametriza — no concatenar SQL.
-- Tokens MP y credenciales wpp **cifrados** en DB.
-- Webhooks: firma (`x-signature` / `X-Hub-Signature-256`) antes de confiar en el payload.
+- Auth panel: Auth.js (Credentials + Google) en `apps/app`. Mismo email → mismo usuario. `tenantId` de la sesión/membresía, jamás del body/query.
+- Secrets en env. `NEXT_PUBLIC_*` solo valores públicos.
+- Rate limiting en endpoints públicos y de reserva.
+- Input externo → Zod. Drizzle parametriza SQL.
+- Tokens Mercado Pago **cifrados** en DB. (Credenciales WhatsApp: misma regla cuando llegue esa fase.)
+- Webhook MP: verificar `x-signature` antes de confiar.
 
-## Packages compartidos
+## Packages
 
-- `packages/core`: reglas de negocio puras. Sin Express, sin Next, sin Baileys.
-- `packages/shared`: schemas Zod, constantes, helpers fecha/dinero. Una definición para front, actions y bot.
-- Consumo interno: `"@repo/db": "workspace:*"` (no se publican).
+- `core`: dominio puro — disponibilidad, precios, señas, cancelaciones, stock adicionales.
+- `shared`: schemas Zod compartidos front ↔ API.
+- Workspace: `"@repo/db": "workspace:*"`.
 
 ## Calidad
 
-- TypeScript `strict: true` en todo el monorepo (`tsconfig.base.json`).
-- ESLint + Prettier compartidos en raíz.
-- Tests donde duelen: unit de `core` (disponibilidad, precios, cancelaciones) + E2E mínimo reservar→señar→confirmar.
-- CI: typecheck + lint + tests en cada PR.
-- Commits: `feat:`, `fix:` (convención corta).
+- `strict: true` en todo el monorepo.
+- Unit tests **obligatorios** en `core`: disponibilidad, reglas de precio, señas/cancelación, stock.
+- Zona horaria: UTC en DB, display en hora Argentina.
+- Commits: `feat:`, `fix:`.

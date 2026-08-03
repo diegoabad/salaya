@@ -1,0 +1,30 @@
+---
+description: Contexto del SaaS multi-tenant de salas de ensayo (Argentina)
+alwaysApply: true
+---
+
+# Producto — salas de ensayo
+
+SaaS multi-tenant (Argentina). Datos en **UTC**, UI en hora AR. Dinero con **decimales**.
+
+## Actores
+
+- **Dueño/empleado**: Auth.js (email/password + Google). Mismo email → mismo usuario (vincular, no duplicar). N:N user↔tenant con rol `owner` | `employee`.
+- **Músico**: sin login. Identidad = teléfono. Reusar ficha por `(tenant, teléfono)`.
+
+## Auth
+
+- Auth.js vive en `apps/app` (Credentials + Google). Puede escribir tablas de auth (`users`, `accounts`, `sessions`).
+- El resto de mutaciones de negocio: solo `apps/api`.
+
+## Jerarquía
+
+`tenant` → `sede` → `sala`. Duración/granularidad: override opcional en **sala**; si null, hereda política de sede.
+
+## Fuera de alcance ahora (dejar hueco)
+
+WhatsApp, cuenta del músico, fijos/recurrentes, packs complejos, lista de espera. Sí preparar: `origen` whatsapp, outbox de notificaciones, `credito_favor` en cliente.
+
+## Etapas
+
+1 Schema → 2 Core → 3 API ABM → 4 Panel → 5 Público/hold → 6 MP → 7 Cancel/no-show/email

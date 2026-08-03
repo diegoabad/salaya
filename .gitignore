@@ -14,6 +14,12 @@ out
 build
 *.tsbuildinfo
 
+# uploads locales (Multer / Sharp)
+uploads/
+
+# Places smoke outputs (place_ids / details)
+apps/api/scripts/out/
+
 # misc
 .DS_Store
 *.log
