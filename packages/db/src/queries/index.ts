@@ -35,6 +35,7 @@ export {
 
 export {
   listReservasRango,
+  listReservasByCliente,
   listReservasParaRecordatorio,
   upsertClienteByTelefono,
   getReservaById,
@@ -60,6 +61,7 @@ export {
   insertClienteMembresia,
   insertMembresiaPlan,
   listClienteMembresias,
+  listMembresiasByCliente,
   listMembresiaPlanes,
   updateClienteMembresiaRow,
   updateMembresiaPlanRow,

@@ -20,6 +20,12 @@ const politica = {
   granularidadMinutos: 60,
 };
 
+const politicaSinTope = {
+  duracionMinMinutos: 60,
+  duracionMaxMinutos: null,
+  granularidadMinutos: 60,
+};
+
 /** Jueves 12:00–14:00 ART */
 const slot = {
   startsAt: new Date("2026-07-16T15:00:00.000Z"),
@@ -37,6 +43,23 @@ describe("assertDisponible", () => {
         bloqueos: [],
         reservas: [],
         politicaDuracion: politica,
+      }),
+    ).not.toThrow();
+  });
+
+  it("sin tope máximo acepta reservas largas", () => {
+    expect(() =>
+      assertDisponible({
+        intervalo: {
+          startsAt: new Date("2026-07-16T13:00:00.000Z"), // 10 ART
+          endsAt: new Date("2026-07-16T18:00:00.000Z"), // 15 ART = 5h
+        },
+        salaId: "sala-1",
+        sedeId: "sede-1",
+        horarios,
+        bloqueos: [],
+        reservas: [],
+        politicaDuracion: politicaSinTope,
       }),
     ).not.toThrow();
   });

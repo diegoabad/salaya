@@ -70,6 +70,7 @@ function salaPayloadFromForm(
       popular: formData.get("popular") === "on",
       nueva: formData.get("nueva") === "on",
       sortOrder: optionalInt(formData, "sortOrder") ?? 0,
+      duracionMaxMinutos: optionalInt(formData, "duracionMaxMinutos"),
       active: true,
     },
   };

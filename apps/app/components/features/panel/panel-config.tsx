@@ -422,7 +422,12 @@ export function PanelConfigView({
               <TextField
                 label="Duración máx (min)"
                 name="duracionMaxMinutos"
-                defaultValue={String(negocio.politica?.duracionMaxMinutos ?? 240)}
+                defaultValue={
+                  negocio.politica?.duracionMaxMinutos != null
+                    ? String(negocio.politica.duracionMaxMinutos)
+                    : ""
+                }
+                placeholder="Vacío = sin tope"
               />
               <div>
                 <label className="text-xs uppercase tracking-wide text-muted">
@@ -826,12 +831,14 @@ function TextField({
   name,
   defaultValue,
   required,
+  placeholder,
   className = "",
 }: {
   label: string;
   name: string;
   defaultValue: string;
   required?: boolean;
+  placeholder?: string;
   className?: string;
 }) {
   return (
@@ -842,6 +849,7 @@ function TextField({
         type="text"
         required={required}
         defaultValue={defaultValue}
+        placeholder={placeholder}
         className="mt-1 w-full rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-brand/50"
       />
     </div>

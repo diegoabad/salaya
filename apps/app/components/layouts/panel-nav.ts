@@ -40,6 +40,7 @@ export const PANEL_NAV_GROUPS: PanelNavGroup[] = [
       { href: "/panel", label: "Agenda", icon: "hoy" },
       { href: "/panel/caja", label: "Caja", icon: "caja" },
       { href: "/panel/clientes", label: "Clientes", icon: "clientes" },
+      { href: "/panel/abonos", label: "Abonos", icon: "membresias" },
     ],
   },
   {
@@ -51,7 +52,6 @@ export const PANEL_NAV_GROUPS: PanelNavGroup[] = [
       { href: "/panel/precios", label: "Precios", icon: "precios" },
       { href: "/panel/promociones", label: "Promociones", icon: "promos" },
       { href: "/panel/adicionales", label: "Adicionales", icon: "adicionales" },
-      { href: "/panel/membresias", label: "Membresías", icon: "membresias" },
       { href: "/panel/resenas", label: "Reseñas", icon: "resenas" },
     ],
   },

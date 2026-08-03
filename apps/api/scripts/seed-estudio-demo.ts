@@ -23,6 +23,8 @@ import {
   userTenants,
   users,
   reglasPrecio,
+  adicionalGrupos,
+  adicionales,
 } from "@repo/db";
 import { POLITICA_DEFAULTS } from "@repo/shared";
 
@@ -371,6 +373,74 @@ async function main() {
           descuentoPorcentaje: "25.00",
           active: true,
         });
+      }
+
+      const [grupoBackline] = await tx
+        .insert(adicionalGrupos)
+        .values({
+          tenantId: tenant!.id,
+          sedeId: sede!.id,
+          name: "Backline",
+          sortOrder: 0,
+        })
+        .returning({ id: adicionalGrupos.id });
+      const [grupoServicios] = await tx
+        .insert(adicionalGrupos)
+        .values({
+          tenantId: tenant!.id,
+          sedeId: sede!.id,
+          name: "Servicios",
+          sortOrder: 1,
+        })
+        .returning({ id: adicionalGrupos.id });
+
+      if (grupoBackline && grupoServicios) {
+        await tx.insert(adicionales).values([
+          {
+            tenantId: tenant!.id,
+            grupoId: grupoBackline.id,
+            name: "Micrófono extra",
+            precioBase: "500.00",
+            modalidad: "por_reserva",
+            stock: 8,
+            active: true,
+            caracteristicas: ["XLR", "Incluye pie"],
+            photoUrl: PHOTO.a,
+          },
+          {
+            tenantId: tenant!.id,
+            grupoId: grupoBackline.id,
+            name: "Teclado",
+            precioBase: "800.00",
+            modalidad: "por_hora",
+            stock: 2,
+            active: true,
+            caracteristicas: ["61 teclas", "Con stand"],
+            photoUrl: PHOTO.c,
+          },
+          {
+            tenantId: tenant!.id,
+            grupoId: grupoBackline.id,
+            name: "Set de platos",
+            precioBase: "1200.00",
+            modalidad: "por_reserva",
+            stock: 3,
+            active: true,
+            caracteristicas: ["Hi-hat", "Crash", "Ride"],
+            photoUrl: PHOTO.d,
+          },
+          {
+            tenantId: tenant!.id,
+            grupoId: grupoServicios.id,
+            name: "Ingeniero de sonido",
+            precioBase: "3500.00",
+            modalidad: "por_hora",
+            stock: null,
+            active: true,
+            caracteristicas: ["Sesión en vivo"],
+            photoUrl: PHOTO.e,
+          },
+        ]);
       }
 
       await tx.insert(resenas).values([

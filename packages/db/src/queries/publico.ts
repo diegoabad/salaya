@@ -93,6 +93,7 @@ export type PublicEstudio = {
   photos: string[];
   lat: number | null;
   lng: number | null;
+  googlePlaceId?: string | null;
   libresHoy: number | null;
   amenidades: string[];
   horarios: PublicHorario[];
@@ -198,6 +199,7 @@ export async function getEstudioPublicoBySlug(
       photos: dir.photoUrl ? [dir.photoUrl] : [],
       lat: numOrNull(dir.lat),
       lng: numOrNull(dir.lng),
+      googlePlaceId: dir.googlePlaceId ?? null,
       libresHoy: null,
       amenidades: dir.tagsDestacados,
       horarios: (dir.horarios ?? []) as PublicHorario[],
@@ -327,6 +329,7 @@ export async function getEstudioPublicoBySlug(
     })(),
     lat: numOrNull(sede.lat ?? dir?.lat),
     lng: numOrNull(sede.lng ?? dir?.lng),
+    googlePlaceId: dir?.googlePlaceId ?? null,
     libresHoy,
     amenidades: sede.amenidades,
     horarios: horarios.map((h) => ({

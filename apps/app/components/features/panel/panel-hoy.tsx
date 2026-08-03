@@ -1013,7 +1013,7 @@ export function PanelHoyView({
   bloqueos = [],
   clientes = [],
   duracionMinMinutos = 60,
-  duracionMaxMinutos = 240,
+  duracionMaxMinutos = null,
   granularidadMinutos = 60,
   horaApertura = null,
   horaCierre = null,
@@ -1791,7 +1791,7 @@ export function PanelHoyView({
         onClose={() => setSelected(null)}
         title="Detalle del turno"
         placement="center"
-        className="max-h-[min(92vh,900px)]! sm:max-w-6xl!"
+        className="h-[min(max-content,min(92vh,900px))]! max-h-[min(92vh,900px)]! sm:max-w-6xl!"
         bodyClassName="flex flex-col py-3 sm:py-3.5"
         headerClassName="px-5 py-4 sm:px-6 sm:py-5"
         footer={
@@ -1874,10 +1874,11 @@ export function PanelHoyView({
         }
       >
         {selected ? (
-          <div className="flex min-h-0 flex-col gap-5">
+          <div className="grid min-h-0 gap-5 lg:grid-cols-2 lg:items-start">
+            <div className="flex min-w-0 flex-col gap-5">
             {/* Bloque datos */}
             <div className="shrink-0 rounded-xl border border-line bg-surface p-3 sm:p-4">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
                 <div className="flex flex-col gap-0.5 text-sm">
                   <span className="text-xs font-medium text-muted">Sala</span>
                   <div className="truncate rounded-lg border border-line bg-paper px-2.5 py-2 text-ink">
@@ -1931,6 +1932,23 @@ export function PanelHoyView({
               </div>
             </div>
 
+            {selected.estado === "hold" && selected.holdExpiresAt ? (
+              <p className="shrink-0 text-xs text-amber-700">
+                Hold vence:{" "}
+                {new Date(selected.holdExpiresAt).toLocaleString("es-AR", {
+                  timeZone: "America/Argentina/Buenos_Aires",
+                })}
+              </p>
+            ) : null}
+
+            {error ? (
+              <p className="shrink-0 text-sm text-red-600" role="alert">
+                {error}
+              </p>
+            ) : null}
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-5">
             {/* Bloque adicionales */}
             <div className="shrink-0">
               <AdicionalesPicker
@@ -1944,7 +1962,7 @@ export function PanelHoyView({
             </div>
 
             {/* Bloque totales */}
-            <div className="mt-2 shrink-0 rounded-xl border border-line bg-paper px-3.5 py-3 text-ink">
+            <div className="shrink-0 rounded-xl border border-line bg-paper px-3.5 py-3 text-ink">
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-brand/80">
                 Totales
               </p>
@@ -1989,21 +2007,7 @@ export function PanelHoyView({
                 </li>
               </ul>
             </div>
-
-            {selected.estado === "hold" && selected.holdExpiresAt ? (
-              <p className="shrink-0 text-xs text-amber-700">
-                Hold vence:{" "}
-                {new Date(selected.holdExpiresAt).toLocaleString("es-AR", {
-                  timeZone: "America/Argentina/Buenos_Aires",
-                })}
-              </p>
-            ) : null}
-
-            {error ? (
-              <p className="shrink-0 text-sm text-red-600" role="alert">
-                {error}
-              </p>
-            ) : null}
+            </div>
           </div>
         ) : null}
       </Modal>
@@ -2088,7 +2092,7 @@ export function PanelHoyView({
         onClose={() => setOpenCreate(false)}
         title="Nueva reserva"
         placement="center"
-        className="max-h-[min(96vh,980px)]! sm:max-w-6xl!"
+        className="h-[min(max-content,min(96vh,980px))]! max-h-[min(96vh,980px)]! sm:max-w-6xl!"
         bodyClassName="flex flex-col py-3 sm:py-3.5"
         headerClassName="px-5 py-4 sm:px-6 sm:py-5"
         footer={
@@ -2113,7 +2117,7 @@ export function PanelHoyView({
         <form
           id="panel-create-reserva-form"
           key={`${createDefaults.salaId ?? "s"}-${createDefaults.horaInicio ?? "h"}-${openCreate}`}
-          className="flex min-h-0 flex-col gap-5"
+          className="grid min-h-0 gap-5 lg:grid-cols-2 lg:items-start"
           onSubmit={(e) => {
             e.preventDefault();
             const fd = new FormData(e.currentTarget);
@@ -2157,9 +2161,10 @@ export function PanelHoyView({
             });
           }}
         >
+          <div className="flex min-w-0 flex-col gap-5">
           {/* Bloque datos */}
           <div className="shrink-0 rounded-xl border border-line bg-surface p-3 sm:p-4">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
               <div className="flex flex-col gap-0.5 text-sm">
                 <span className="text-xs font-medium text-muted">Sala</span>
                 <select
@@ -2354,7 +2359,9 @@ export function PanelHoyView({
               </div>
             </div>
           </div>
+          </div>
 
+          <div className="flex min-w-0 flex-col gap-5">
           {/* Bloque adicionales */}
           <div className="shrink-0">
             <AdicionalesPicker
@@ -2452,6 +2459,7 @@ export function PanelHoyView({
                 </span>
               </li>
             </ul>
+          </div>
           </div>
         </form>
       </Modal>

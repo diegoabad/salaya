@@ -70,7 +70,11 @@ export const updateNegocioSchema = z.object({
   holdMinutos: z.coerce.number().int().min(1).max(120).optional(),
   cancelacionVentanaHoras: z.coerce.number().int().min(0).max(168).optional(),
   duracionMinMinutos: z.coerce.number().int().min(15).max(480).optional(),
-  duracionMaxMinutos: z.coerce.number().int().min(30).max(720).optional(),
+  /** null / vacío = sin tope */
+  duracionMaxMinutos: z.preprocess((v) => {
+    if (v === "" || v == null || v === undefined) return null;
+    return v;
+  }, z.coerce.number().int().min(30).max(1440).nullable().optional()),
   senaModo: z.enum(SENA_MODOS).optional(),
   senaTipo: z.enum(SENA_TIPOS).optional(),
   senaValor: moneySchema.optional(),
@@ -192,13 +196,10 @@ export const salaFieldsSchema = z.object({
     .max(480)
     .optional()
     .nullable(),
-  duracionMaxMinutos: z.coerce
-    .number()
-    .int()
-    .min(30)
-    .max(720)
-    .optional()
-    .nullable(),
+  duracionMaxMinutos: z.preprocess((v) => {
+    if (v === "" || v == null || v === undefined) return null;
+    return v;
+  }, z.coerce.number().int().min(30).max(1440).nullable().optional()),
   granularidadMinutos: z.coerce
     .number()
     .int()

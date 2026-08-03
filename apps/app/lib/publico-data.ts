@@ -41,6 +41,7 @@ function mapEstudio(e: PublicEstudio): EstudioDetalle {
     photos: (e.photos ?? []).filter((p) => Boolean(p?.trim())),
     lat: e.lat,
     lng: e.lng,
+    googlePlaceId: e.googlePlaceId ?? null,
     libresHoy: e.libresHoy,
     amenidades: e.amenidades,
     horarios: e.horarios ?? [],

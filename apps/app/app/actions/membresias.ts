@@ -9,6 +9,9 @@ export type MembresiaPlanDto = {
   descripcion: string | null;
   precioMensual: number;
   creditoMensual: number;
+  horasMensuales: number;
+  horasMinSemanales: number;
+  diasPreferidos: number[];
   diasPeriodo: number;
   active: boolean;
 };
@@ -27,6 +30,9 @@ export type ClienteMembresiaDto = {
   planName: string;
   precioMensual: number;
   creditoMensual: number;
+  horasMensuales: number;
+  horasMinSemanales: number;
+  diasPreferidos: number[];
   diasPeriodo: number;
 };
 
@@ -37,7 +43,9 @@ export type MembresiasBundleDto = {
 
 function revalidate() {
   revalidatePath("/panel/membresias");
+  revalidatePath("/panel/abonos");
   revalidatePath("/panel-demo/membresias");
+  revalidatePath("/panel-demo/abonos");
   revalidatePath("/panel/clientes");
   revalidatePath("/panel/caja");
 }
@@ -51,12 +59,18 @@ export async function createMembresiaPlanAction(input: {
   name: string;
   descripcion?: string | null;
   precioMensual: string;
-  creditoMensual: string;
+  horasMensuales: string;
+  horasMinSemanales?: string;
+  diasPreferidos?: number[];
   diasPeriodo?: number;
+  creditoMensual?: string;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const res = await panelApiFetch<{ id: string }>("/membresias/planes", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      creditoMensual: "0",
+      ...input,
+    }),
   });
   if (!res.ok) return { ok: false, error: res.error };
   revalidate();
@@ -69,6 +83,9 @@ export async function updateMembresiaPlanAction(
     name?: string;
     descripcion?: string | null;
     precioMensual?: string;
+    horasMensuales?: string;
+    horasMinSemanales?: string;
+    diasPreferidos?: number[];
     creditoMensual?: string;
     diasPeriodo?: number;
     active?: boolean;

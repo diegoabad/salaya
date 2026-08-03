@@ -43,7 +43,7 @@ export default async function PanelDemoHomePage({ searchParams }: Props) {
       bloqueos={bloqueosDelDia}
       clientes={demo.clientes}
       duracionMinMinutos={demo.negocio.politica?.duracionMinMinutos ?? 60}
-      duracionMaxMinutos={demo.negocio.politica?.duracionMaxMinutos ?? 240}
+      duracionMaxMinutos={demo.negocio.politica?.duracionMaxMinutos ?? null}
       granularidadMinutos={60}
       horaApertura={franja.apertura}
       horaCierre={franja.cierre}

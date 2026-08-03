@@ -99,7 +99,7 @@ function conceptoLabel(c: string) {
     case "credito":
       return "Crédito a favor";
     case "membresia":
-      return "Membresía";
+      return "Abono";
     default:
       return c;
   }

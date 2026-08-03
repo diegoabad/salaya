@@ -317,7 +317,9 @@ export function PanelMiEstudioView({
       );
       fd.set(
         "duracionMaxMinutos",
-        String(negocio.politica?.duracionMaxMinutos ?? 240),
+        negocio.politica?.duracionMaxMinutos != null
+          ? String(negocio.politica.duracionMaxMinutos)
+          : "",
       );
       fd.set("senaModo", negocio.politica?.senaModo ?? "siempre");
       fd.set("senaTipo", negocio.politica?.senaTipo ?? "porcentaje");

@@ -14,7 +14,7 @@ type Props = {
   className?: string;
   /**
    * `js` = Google Maps JS (default si hay key).
-   * `embed` = iframe OSM (fallback).
+   * `embed` = iframe (Google Embed si hay key, si no OSM).
    * `auto` = JS si hay key, si no embed.
    */
   mode?: "auto" | "js" | "embed";
@@ -43,6 +43,30 @@ function googleMapsPlaceUrl(input: {
   return `https://www.google.com/maps/search/?api=1&query=${input.lat},${input.lng}`;
 }
 
+function googleMapsEmbedSrc(input: {
+  lat: number;
+  lng: number;
+  address?: string;
+  name?: string;
+  googlePlaceId?: string | null;
+}): string {
+  // Preferimos el embed “clásico” (no requiere Maps Embed API habilitada).
+  // Si hay Place ID, abrimos por query_place_id vía search → output=embed no lo soporta bien,
+  // así que usamos lat/lng o texto.
+  const placeId = input.googlePlaceId?.trim();
+  if (placeId) {
+    const label = encodeURIComponent(
+      input.name?.trim() || input.address?.trim() || "lugar",
+    );
+    return `https://www.google.com/maps?q=${label}&query_place_id=${encodeURIComponent(placeId)}&z=15&output=embed&hl=es`;
+  }
+  const label = input.name?.trim() || input.address?.trim();
+  if (label) {
+    return `https://www.google.com/maps?q=${encodeURIComponent(label)}&z=15&output=embed&hl=es`;
+  }
+  return `https://www.google.com/maps?q=${input.lat},${input.lng}&z=15&output=embed&hl=es`;
+}
+
 function MapEmbedFallback({
   lat,
   lng,
@@ -58,9 +82,13 @@ function MapEmbedFallback({
   googlePlaceId?: string | null;
   className: string;
 }) {
-  const delta = 0.01;
-  const bbox = `${lng - delta},${lat - delta},${lng + delta},${lat + delta}`;
-  const osm = `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${encodeURIComponent(`${lat},${lng}`)}`;
+  const embedSrc = googleMapsEmbedSrc({
+    lat,
+    lng,
+    address,
+    name,
+    googlePlaceId,
+  });
   const mapsLink = googleMapsPlaceUrl({
     lat,
     lng,
@@ -75,11 +103,12 @@ function MapEmbedFallback({
     >
       <iframe
         title={address ? `Mapa · ${address}` : "Mapa"}
-        src={osm}
+        src={embedSrc}
         className="min-h-0 w-full flex-1 border-0"
         style={{ height: "100%", minHeight: 0 }}
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
+        allowFullScreen
       />
       <a
         href={mapsLink}

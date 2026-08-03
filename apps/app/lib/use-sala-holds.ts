@@ -26,17 +26,25 @@ function horaToMinutes(hora: string) {
   return h! * 60 + m!;
 }
 
-function hayHuecos(horas: string[]): boolean {
-  if (horas.length < 2) return false;
-  const sorted = [...horas].sort(
+function minutesToHora(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Completa huecos de 60 min entre la primera y la última hora elegida. */
+function expandirHorasContiguas(horas: string[]): string[] {
+  const sorted = [...new Set(horas)].sort(
     (a, b) => horaToMinutes(a) - horaToMinutes(b),
   );
-  for (let i = 1; i < sorted.length; i++) {
-    if (horaToMinutes(sorted[i]!) - horaToMinutes(sorted[i - 1]!) !== 60) {
-      return true;
-    }
+  if (sorted.length <= 1) return sorted;
+  const out: string[] = [];
+  const from = horaToMinutes(sorted[0]!);
+  const to = horaToMinutes(sorted[sorted.length - 1]!);
+  for (let m = from; m <= to; m += 60) {
+    out.push(minutesToHora(m));
   }
-  return false;
+  return out;
 }
 
 const POLITICA_FALLBACK: PoliticaPublica = {
@@ -179,12 +187,10 @@ export function useSalaHolds({
             }
             return;
           }
-          if (hayHuecos(selectedHoras)) {
-            return;
-          }
+          const horas = expandirHorasContiguas(selectedHoras);
           const hold = await putHold(salaId, {
             fecha,
-            horas: selectedHoras,
+            horas,
           });
           ownHoldIdRef.current = hold.id;
           upsertLocal(hold);
@@ -193,7 +199,7 @@ export function useSalaHolds({
           const err = e as Error & { code?: string; horas?: string[] };
           if (err.code === "HOLD_CONFLICT" && err.horas?.length) {
             onConflictRef.current?.(err.horas);
-          } else if (err.code !== "HOLD_NOT_CONTIGUOUS") {
+          } else {
             setSyncError(err.message || "No se pudo bloquear el horario");
           }
         }

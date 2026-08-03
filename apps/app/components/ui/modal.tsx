@@ -9,6 +9,11 @@ type Props = {
   title: string;
   /** Contenido a la derecha del título (ej. estrellas) */
   titleExtra?: React.ReactNode;
+  /**
+   * Contenido fuera del panel, sobre el fondo oscuro
+   * (ej. contador arriba a la derecha).
+   */
+  overlay?: React.ReactNode;
   children: React.ReactNode;
   /** Pie fijo fuera del scroll (acciones) */
   footer?: React.ReactNode;
@@ -30,6 +35,7 @@ export function Modal({
   onClose,
   title,
   titleExtra,
+  overlay,
   children,
   footer,
   className = "",
@@ -91,6 +97,11 @@ export function Modal({
           if (backdropReady) onClose();
         }}
       />
+      {overlay ? (
+        <div className="pointer-events-none absolute right-4 top-4 z-20 sm:right-6 sm:top-5">
+          {overlay}
+        </div>
+      ) : null}
       <div
         ref={panelRef}
         role="dialog"
@@ -98,7 +109,7 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className={`relative z-10 flex h-auto min-h-0 max-h-[min(92vh,720px)] w-full flex-col overflow-hidden border border-line bg-surface shadow-2xl outline-none sm:max-w-2xl ${
+        className={`relative z-10 flex max-h-[min(92vh,720px)] w-full flex-col overflow-hidden border border-line bg-surface shadow-2xl outline-none sm:max-w-2xl ${
           centered ? "rounded-2xl" : "rounded-t-2xl sm:rounded-2xl"
         } ${className}`}
       >

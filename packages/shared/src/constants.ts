@@ -139,7 +139,8 @@ export const POLITICA_DEFAULTS = {
   senaDestinoCancelacion: "perder" as SenaDestinoCancelacion,
   permiteReprogramar: true,
   duracionMinMinutos: 60,
-  duracionMaxMinutos: 240,
+  /** null = sin tope; el estudio puede definir máx. en política o por sala */
+  duracionMaxMinutos: null as number | null,
   granularidadMinutos: 60,
   requiereAprobacionSinSena: false,
 } as const;

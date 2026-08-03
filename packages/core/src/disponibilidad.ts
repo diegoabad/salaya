@@ -42,7 +42,10 @@ export function assertDuracionValida(
       `Duración mínima: ${politica.duracionMinMinutos} minutos`,
     );
   }
-  if (mins > politica.duracionMaxMinutos) {
+  if (
+    politica.duracionMaxMinutos != null &&
+    mins > politica.duracionMaxMinutos
+  ) {
     throw new DuracionInvalidaError(
       `Duración máxima: ${politica.duracionMaxMinutos} minutos`,
     );

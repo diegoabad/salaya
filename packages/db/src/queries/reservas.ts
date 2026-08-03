@@ -2,6 +2,38 @@ import { and, eq, gte, lt, sql } from "drizzle-orm";
 import type { Database } from "../client";
 import { clientes, reservas, salas } from "../schema";
 
+export async function listReservasByCliente(
+  db: Database,
+  tenantId: string,
+  clienteId: string,
+  limit = 40,
+) {
+  return db
+    .select({
+      id: reservas.id,
+      salaId: reservas.salaId,
+      salaName: salas.name,
+      startsAt: reservas.startsAt,
+      endsAt: reservas.endsAt,
+      estado: reservas.estado,
+      origen: reservas.origen,
+      precioTotal: reservas.precioTotal,
+      senaMonto: reservas.senaMonto,
+      senaPagada: reservas.senaPagada,
+    })
+    .from(reservas)
+    .innerJoin(salas, eq(salas.id, reservas.salaId))
+    .where(
+      and(
+        eq(reservas.tenantId, tenantId),
+        eq(reservas.clienteId, clienteId),
+        sql`${reservas.estado} not in ('hold')`,
+      ),
+    )
+    .orderBy(sql`${reservas.startsAt} desc`)
+    .limit(limit);
+}
+
 export async function listReservasRango(
   db: Database,
   tenantId: string,

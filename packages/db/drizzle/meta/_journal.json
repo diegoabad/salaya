@@ -155,6 +155,62 @@
       "when": 1784574400000,
       "tag": "0021_tenant_contact_links",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784574500000,
+      "tag": "0022_adicionales_caracteristicas",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784574600000,
+      "tag": "0023_adicionales_photo",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784574700000,
+      "tag": "0024_inicio_caja",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1784574800000,
+      "tag": "0025_cierre_caja",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784574900000,
+      "tag": "0026_credito_caja",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784575000000,
+      "tag": "0027_membresias",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1785760000000,
+      "tag": "0028_abonos_horas",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1785761000000,
+      "tag": "0029_duracion_max_nullable",
+      "breakpoints": true
     }
   ]
 }

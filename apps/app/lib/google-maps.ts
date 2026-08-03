@@ -21,7 +21,8 @@ export function loadGoogleMaps(): Promise<typeof google.maps> {
     return Promise.reject(new Error("Google Maps solo en el navegador"));
   }
   const w = window as GoogleMapsWindow;
-  if (w.google?.maps?.places) {
+  // Maps alcanza; Places puede demorar un tick tras el callback
+  if (w.google?.maps) {
     return Promise.resolve(w.google.maps);
   }
 

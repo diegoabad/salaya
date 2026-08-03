@@ -1,13 +1,5 @@
-import { PanelMembresiasView } from "@/components/features/panel/panel-membresias";
-import { loadPanelDemoBundle } from "@/lib/panel-demo-data";
+import { redirect } from "next/navigation";
 
-export default async function PanelDemoMembresiasPage() {
-  const demo = await loadPanelDemoBundle();
-  return (
-    <PanelMembresiasView
-      data={demo.membresias}
-      clientes={demo.clientes}
-      isDemo
-    />
-  );
+export default function PanelDemoMembresiasRedirect() {
+  redirect("/panel-demo/abonos");
 }

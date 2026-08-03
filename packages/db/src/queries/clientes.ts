@@ -1,6 +1,12 @@
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { Database } from "../client";
-import { clientes, reservas, salas } from "../schema";
+import {
+  clienteMembresias,
+  clientes,
+  membresiaPlanes,
+  reservas,
+  salas,
+} from "../schema";
 
 export async function listClientesConStats(db: Database, tenantId: string) {
   const rows = await db
@@ -57,9 +63,36 @@ export async function listClientesConStats(db: Database, tenantId: string) {
     }
   }
 
+  const abonosActivos = await db
+    .select({
+      clienteId: clienteMembresias.clienteId,
+      planName: membresiaPlanes.name,
+      updatedAt: clienteMembresias.updatedAt,
+    })
+    .from(clienteMembresias)
+    .innerJoin(
+      membresiaPlanes,
+      eq(membresiaPlanes.id, clienteMembresias.planId),
+    )
+    .where(
+      and(
+        eq(clienteMembresias.tenantId, tenantId),
+        eq(clienteMembresias.estado, "activa"),
+      ),
+    )
+    .orderBy(desc(clienteMembresias.updatedAt));
+
+  const abonoByCliente = new Map<string, string>();
+  for (const a of abonosActivos) {
+    if (!abonoByCliente.has(a.clienteId)) {
+      abonoByCliente.set(a.clienteId, a.planName);
+    }
+  }
+
   return rows.map((row) => ({
     ...row,
     salaHabitual: salaByCliente.get(row.id)?.name ?? null,
+    abonoNombre: abonoByCliente.get(row.id) ?? null,
   }));
 }
 

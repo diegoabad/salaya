@@ -10,11 +10,6 @@ import {
   putHold,
   type AdicionalPublicoGrupo,
 } from "@/lib/holds-api";
-import {
-  POLITICA_DEFAULTS,
-  SALAYA_CANCEL_DISCLAIMER,
-  textoPoliticaCancelacion,
-} from "@repo/shared";
 import { useEffect, useMemo, useState } from "react";
 
 export type DemoPoliticaSena = {
@@ -27,7 +22,7 @@ export type DemoPoliticaSena = {
 };
 
 type Mode = "invitado" | "cuenta";
-type Step = "datos" | "pago" | "ok";
+type Step = "extras" | "datos" | "pago" | "ok";
 
 type Props = {
   open: boolean;
@@ -72,6 +67,20 @@ function precioLinea(
   return Math.round(item.precioBase * cantidad);
 }
 
+function PasoIndicator({ actual }: { actual: 1 | 2 }) {
+  return (
+    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted">
+      <span className={actual === 1 ? "text-brand" : "text-muted"}>
+        1. Extras
+      </span>
+      <span aria-hidden>·</span>
+      <span className={actual === 2 ? "text-brand" : "text-muted"}>
+        2. Tus datos
+      </span>
+    </div>
+  );
+}
+
 export function ReservaCheckoutModal({
   open,
   onClose,
@@ -87,7 +96,7 @@ export function ReservaCheckoutModal({
   onConfirmed,
   onTotalChange,
 }: Props) {
-  const [step, setStep] = useState<Step>("datos");
+  const [step, setStep] = useState<Step>("extras");
   const [mode, setMode] = useState<Mode>("invitado");
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
@@ -101,6 +110,8 @@ export function ReservaCheckoutModal({
   const [qty, setQty] = useState<Record<string, number>>({});
   const [syncingExtras, setSyncingExtras] = useState(false);
   const [holdTotal, setHoldTotal] = useState<number | null>(null);
+  /** Evita que el tap de “Continuar” dispare el submit del paso datos */
+  const [datosReady, setDatosReady] = useState(false);
 
   const extrasLocal = useMemo(() => {
     let sum = 0;
@@ -128,7 +139,7 @@ export function ReservaCheckoutModal({
 
   useEffect(() => {
     if (!open) return;
-    setStep("datos");
+    setStep("extras");
     setMode("invitado");
     setError(null);
     setPaying(false);
@@ -136,6 +147,7 @@ export function ReservaCheckoutModal({
     setQty({});
     setHoldTotal(null);
     setGrupos([]);
+    setDatosReady(false);
     let cancelled = false;
     void fetchAdicionalesPublicos(sala.id)
       .then((data) => {
@@ -149,6 +161,16 @@ export function ReservaCheckoutModal({
     };
   }, [open, sala.id]);
 
+  useEffect(() => {
+    if (step !== "datos") {
+      setDatosReady(false);
+      return;
+    }
+    setError(null);
+    setDatosReady(false);
+    const t = window.setTimeout(() => setDatosReady(true), 400);
+    return () => window.clearTimeout(t);
+  }, [step]);
   useEffect(() => {
     if (!open || !holdExpiresAt) return;
     const id = window.setInterval(() => {
@@ -195,7 +217,9 @@ export function ReservaCheckoutModal({
         ? requiereSena
           ? "Pagar seña"
           : "Pagar reserva"
-        : "Completá tu reserva";
+        : step === "extras"
+          ? "Extras del turno"
+          : "Tus datos";
 
   const setItemQty = (id: string, next: number, stock: number | null) => {
     const max = stock == null ? 99 : stock;
@@ -206,6 +230,15 @@ export function ReservaCheckoutModal({
       else copy[id] = n;
       return copy;
     });
+  };
+
+  const irADatos = () => {
+    setError(null);
+    if (syncingExtras) {
+      setError("Esperá un segundo: estamos guardando los extras…");
+      return;
+    }
+    setStep("datos");
   };
 
   const validarDatos = () => {
@@ -233,16 +266,13 @@ export function ReservaCheckoutModal({
       setError("Ingresá tu contraseña.");
       return false;
     }
-    if (!telefono.trim() || telefono.replace(/\D/g, "").length < 8) {
-      setError("Ingresá un teléfono válido (identidad de reserva).");
-      return false;
-    }
     if (!nombre.trim()) setNombre(email.split("@")[0] ?? "Cliente");
     return true;
   };
 
   const irAPagar = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!datosReady) return;
     if (!validarDatos()) return;
     if (syncingExtras) {
       setError("Esperá un segundo: estamos guardando los extras…");
@@ -256,7 +286,9 @@ export function ReservaCheckoutModal({
     setError(null);
     try {
       const nombreOk = nombre.trim() || email.split("@")[0] || "Cliente";
-      const telOk = telefono.trim();
+      const telOk =
+        telefono.trim() ||
+        (mode === "cuenta" ? email.trim().slice(0, 40) : "");
       if (requiereSena || aPagar > 0) {
         const checkout = await checkoutHold({
           salaId: sala.id,
@@ -283,90 +315,157 @@ export function ReservaCheckoutModal({
     }
   };
 
+  const footerContinuarLabel = requiereSena
+    ? `Ir a pagar seña · ${formatPrecio(senaMonto)}`
+    : `Ir a pagar · ${formatPrecio(total)}`;
+
   return (
-    <Modal open={open} onClose={onClose} title={title}>
-      {holdExpiresAt && step !== "ok" && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-brand/30 bg-brand/10 px-3 py-2.5">
-          <p className="text-xs text-muted sm:text-sm">
-            Horarios bloqueados para vos
-          </p>
-          <p className="font-mono text-base font-semibold tabular-nums text-brand">
-            {formatCountdown(holdLeft)}
-          </p>
-        </div>
-      )}
-
-      {step === "datos" && (
-        <form onSubmit={irAPagar} className="flex flex-col gap-4">
-          <div className="rounded-xl border border-line bg-paper/50 px-3 py-3 text-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-medium text-ink">{sala.name}</p>
-                <p className="mt-1 capitalize text-muted">{fechaLabel}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="flex flex-wrap items-baseline justify-end gap-x-2 gap-y-0.5">
-                  <span className="text-lg font-semibold leading-tight text-brand sm:text-xl">
-                    {formatPrecio(total)}
-                  </span>
-                  <span className="text-xs text-muted sm:text-sm">
-                    {horas.length}h · {rangos.join(", ")}
-                  </span>
-                </p>
-                {extrasLocal > 0 && (
-                  <p className="mt-0.5 text-xs text-muted">
-                    Sala {formatPrecio(totalSala)} + extras{" "}
-                    {formatPrecio(extrasLocal)}
-                  </p>
-                )}
-                {requiereSena ? (
-                  <p className="mt-1 text-xs text-muted sm:text-sm">
-                    Seña{" "}
-                    <span className="font-semibold text-ink">
-                      {formatPrecio(senaMonto)}
-                    </span>
-                    <span>
-                      {" "}
-                      ({politica.senaValor}
-                      {politica.senaTipo === "porcentaje" ? "%" : ""})
-                    </span>
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted sm:text-sm">Sin seña</p>
-                )}
-              </div>
-            </div>
-            <div className="mt-3 border-t border-line pt-3 text-xs text-muted sm:text-sm">
-              <p className="font-medium text-ink">Cancelación</p>
-              <p className="mt-1">
-                {textoPoliticaCancelacion({
-                  cancelacionVentanaHoras:
-                    politica.cancelacionVentanaHoras ??
-                    POLITICA_DEFAULTS.cancelacionVentanaHoras,
-                  senaDestinoCancelacion:
-                    politica.senaDestinoCancelacion ??
-                    POLITICA_DEFAULTS.senaDestinoCancelacion,
-                  requiereSena,
-                })}
-              </p>
-              <p className="mt-2 text-[11px] leading-snug text-muted/90 sm:text-xs">
-                {SALAYA_CANCEL_DISCLAIMER}
-              </p>
-            </div>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      placement="center"
+      className={
+        step === "extras" || step === "datos" ? "sm:max-w-xl!" : undefined
+      }
+      overlay={
+        holdExpiresAt && step !== "ok" ? (
+          <div
+            className="rounded-xl border border-brand/50 bg-black px-3.5 py-2.5 text-center shadow-xl"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-xs font-medium text-white sm:text-sm">
+              Tenés para terminar tu reserva
+            </p>
+            <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums leading-none text-brand sm:text-3xl">
+              {formatCountdown(holdLeft)}
+            </p>
           </div>
+        ) : null
+      }
+      footer={
+        step === "extras" ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0 text-sm">
+                <p className="truncate capitalize text-muted">
+                  {sala.name} · {fechaLabel} · {rangos.join(", ")}
+                </p>
+                <p className="mt-0.5 h-4 truncate text-xs text-muted">
+                  Sala {formatPrecio(totalSala)}
+                  {" · extras "}
+                  {formatPrecio(extrasLocal)}
+                  {requiereSena
+                    ? ` · seña ${formatPrecio(senaMonto)}`
+                    : " · sin seña"}
+                  {syncingExtras ? " · …" : ""}
+                </p>
+              </div>
+              <p className="shrink-0 text-right tabular-nums">
+                <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Total
+                </span>
+                <span className="inline-block min-w-[6.5rem] text-xl font-semibold text-brand">
+                  {formatPrecio(total)}
+                </span>
+              </p>
+            </div>
+            {error ? (
+              <p
+                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={irADatos}
+              disabled={syncingExtras}
+              className="rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold leading-[1.4] text-paper transition hover:bg-brand-deep disabled:opacity-60"
+            >
+              Continuar a tus datos
+            </button>
+          </div>
+        ) : step === "datos" ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-end justify-between gap-3">
+              <div className="min-w-0 text-sm">
+                <p className="truncate capitalize text-muted">
+                  {sala.name} · {fechaLabel} · {rangos.join(", ")}
+                </p>
+                <p className="mt-0.5 h-4 truncate text-xs text-muted">
+                  Sala {formatPrecio(totalSala)}
+                  {" · extras "}
+                  {formatPrecio(extrasLocal)}
+                  {requiereSena
+                    ? ` · seña ${formatPrecio(senaMonto)}`
+                    : " · sin seña"}
+                </p>
+              </div>
+              <p className="shrink-0 text-right tabular-nums">
+                <span className="block text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Total
+                </span>
+                <span className="inline-block min-w-[6.5rem] text-xl font-semibold text-brand">
+                  {formatPrecio(total)}
+                </span>
+              </p>
+            </div>
+            {error && datosReady ? (
+              <p
+                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              form="checkout-datos-form"
+              disabled={!datosReady}
+              className="rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold leading-[1.4] text-paper transition hover:bg-brand-deep disabled:opacity-60"
+            >
+              {footerContinuarLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setStep("extras");
+              }}
+              className="text-sm text-muted hover:text-ink"
+            >
+              ← Volver a extras
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
+      {step === "extras" && (
+        <div className="flex flex-col gap-3">
+          <PasoIndicator actual={1} />
 
-          {grupos.length > 0 && (
+          {grupos.length > 0 ? (
             <div className="flex flex-col gap-3">
               <p className="text-sm font-medium text-ink">Adicionales</p>
               {grupos.map((g) => (
-                <div key={g.id} className="rounded-xl border border-line bg-paper/40 p-3">
+                <div
+                  key={g.id}
+                  className="rounded-xl border border-line bg-paper/40 p-3"
+                >
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">
                     {g.name}
                   </p>
                   <ul className="mt-2 space-y-2">
                     {g.items.map((item) => {
                       const n = qty[item.id] ?? 0;
-                      const line = precioLinea(item, Math.max(n, 1), horas.length);
+                      const line = precioLinea(
+                        item,
+                        Math.max(n, 1),
+                        horas.length,
+                      );
                       return (
                         <li
                           key={item.id}
@@ -377,8 +476,12 @@ export function ReservaCheckoutModal({
                             <p className="text-xs text-muted">
                               {formatPrecio(item.precioBase)}
                               {item.modalidad === "por_hora" ? "/h" : ""}
-                              {item.stock != null ? ` · stock ${item.stock}` : ""}
-                              {n > 0 ? ` · ${formatPrecio(precioLinea(item, n, horas.length))}` : ""}
+                              {item.stock != null
+                                ? ` · stock ${item.stock}`
+                                : ""}
+                              {n > 0
+                                ? ` · ${formatPrecio(precioLinea(item, n, horas.length))}`
+                                : ""}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1.5">
@@ -408,20 +511,30 @@ export function ReservaCheckoutModal({
                               +
                             </button>
                           </div>
-                          <span className="sr-only">
-                            {formatPrecio(line)}
-                          </span>
+                          <span className="sr-only">{formatPrecio(line)}</span>
                         </li>
                       );
                     })}
                   </ul>
                 </div>
               ))}
-              {syncingExtras && (
-                <p className="text-xs text-muted">Actualizando total…</p>
-              )}
             </div>
+          ) : (
+            <p className="rounded-xl border border-line bg-paper/40 px-3 py-3 text-sm text-muted">
+              Este turno no tiene adicionales. Podés seguir con tus datos.
+            </p>
           )}
+        </div>
+      )}
+
+      {step === "datos" && (
+        <form
+          id="checkout-datos-form"
+          onSubmit={irAPagar}
+          noValidate
+          className="flex flex-col gap-4"
+        >
+          <PasoIndicator actual={2} />
 
           <div className="flex rounded-xl border border-line bg-paper p-1">
             <button
@@ -460,7 +573,10 @@ export function ReservaCheckoutModal({
                 <span className="font-medium text-muted">Nombre</span>
                 <input
                   value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
+                  onChange={(e) => {
+                    setNombre(e.target.value);
+                    if (error) setError(null);
+                  }}
                   autoComplete="name"
                   className="rounded-xl border border-line bg-paper px-3 py-2.5 text-ink outline-none ring-brand/40 focus:ring-2"
                   placeholder="Tu nombre"
@@ -470,7 +586,10 @@ export function ReservaCheckoutModal({
                 <span className="font-medium text-muted">Teléfono</span>
                 <input
                   value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
+                  onChange={(e) => {
+                    setTelefono(e.target.value);
+                    if (error) setError(null);
+                  }}
                   type="tel"
                   autoComplete="tel"
                   className="rounded-xl border border-line bg-paper px-3 py-2.5 text-ink outline-none ring-brand/40 focus:ring-2"
@@ -481,7 +600,10 @@ export function ReservaCheckoutModal({
                 <span className="font-medium text-muted">Email</span>
                 <input
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError(null);
+                  }}
                   type="email"
                   autoComplete="email"
                   className="rounded-xl border border-line bg-paper px-3 py-2.5 text-ink outline-none ring-brand/40 focus:ring-2"
@@ -498,7 +620,10 @@ export function ReservaCheckoutModal({
                 <span className="font-medium text-muted">Email</span>
                 <input
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError(null);
+                  }}
                   type="email"
                   autoComplete="email"
                   className="rounded-xl border border-line bg-paper px-3 py-2.5 text-ink outline-none ring-brand/40 focus:ring-2"
@@ -508,43 +633,17 @@ export function ReservaCheckoutModal({
                 <span className="font-medium text-muted">Contraseña</span>
                 <input
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError(null);
+                  }}
                   type="password"
                   autoComplete="current-password"
                   className="rounded-xl border border-line bg-paper px-3 py-2.5 text-ink outline-none ring-brand/40 focus:ring-2"
                 />
               </label>
-              <label className="flex flex-col gap-1.5 text-sm">
-                <span className="font-medium text-muted">Teléfono</span>
-                <input
-                  value={telefono}
-                  onChange={(e) => setTelefono(e.target.value)}
-                  type="tel"
-                  autoComplete="tel"
-                  className="rounded-xl border border-line bg-paper px-3 py-2.5 text-ink outline-none ring-brand/40 focus:ring-2"
-                  placeholder="11 2345 6789"
-                />
-              </label>
             </div>
           )}
-
-          {error && (
-            <p
-              className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-              role="alert"
-            >
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            className="rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold leading-[1.4] text-paper transition hover:bg-brand-deep"
-          >
-            {requiereSena
-              ? `Ir a pagar seña · ${formatPrecio(senaMonto)}`
-              : `Ir a pagar · ${formatPrecio(total)}`}
-          </button>
         </form>
       )}
 
@@ -576,7 +675,7 @@ export function ReservaCheckoutModal({
 
           {error && (
             <p
-              className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+              className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700"
               role="alert"
             >
               {error}

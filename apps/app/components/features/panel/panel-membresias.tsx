@@ -25,6 +25,31 @@ import { useMemo, useState, useTransition } from "react";
 
 type Medio = "efectivo" | "transferencia" | "mercadopago" | "tarjeta";
 
+/** Orden UI Lun→Dom; valor = Date#getDay (0=dom … 6=sáb) */
+const DIAS_UI: { value: number; label: string }[] = [
+  { value: 1, label: "Lu" },
+  { value: 2, label: "Ma" },
+  { value: 3, label: "Mi" },
+  { value: 4, label: "Ju" },
+  { value: 5, label: "Vi" },
+  { value: 6, label: "Sa" },
+  { value: 0, label: "Do" },
+];
+
+function formatHoras(n: number) {
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  const rounded = Math.round(n * 10) / 10;
+  return `${rounded} h`;
+}
+
+function formatDiasPreferidos(dias: number[]) {
+  if (!dias.length) return "Sin preferencia";
+  const set = new Set(dias);
+  return DIAS_UI.filter((d) => set.has(d.value))
+    .map((d) => d.label)
+    .join(" · ");
+}
+
 type Props = {
   data: MembresiasBundleDto;
   clientes?: ClienteDto[];
@@ -47,14 +72,18 @@ export function PanelMembresiasView({
   const planes = isDemo ? localPlanes : data.planes;
   const membresias = isDemo ? localMems : data.membresias;
 
-  const [planOpen, setPlanOpen] = useState(false);
-  const [planDraft, setPlanDraft] = useState({
+  const emptyPlanDraft = () => ({
     name: "",
     descripcion: "",
     precioMensual: "",
-    creditoMensual: "",
+    horasMensuales: "",
+    horasMinSemanales: "",
+    diasPreferidos: [] as number[],
     diasPeriodo: "30",
   });
+
+  const [planOpen, setPlanOpen] = useState(false);
+  const [planDraft, setPlanDraft] = useState(emptyPlanDraft);
 
   const [asignarOpen, setAsignarOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -84,16 +113,37 @@ export function PanelMembresiasView({
       .slice(0, 30);
   }, [clientes, q]);
 
+  const toggleDia = (dia: number) => {
+    setPlanDraft((prev) => {
+      const has = prev.diasPreferidos.includes(dia);
+      return {
+        ...prev,
+        diasPreferidos: has
+          ? prev.diasPreferidos.filter((d) => d !== dia)
+          : [...prev.diasPreferidos, dia].sort((a, b) => a - b),
+      };
+    });
+  };
+
   const crearPlan = () => {
     const precio = Number(planDraft.precioMensual.replace(",", "."));
-    const credito = Number(planDraft.creditoMensual.replace(",", "."));
+    const horas = Number(planDraft.horasMensuales.replace(",", "."));
+    const minSem = Number(planDraft.horasMinSemanales.replace(",", ".") || "0");
     const dias = Number(planDraft.diasPeriodo) || 30;
     if (planDraft.name.trim().length < 2) {
-      setError("Nombre del plan demasiado corto");
+      setError("Nombre del abono demasiado corto");
       return;
     }
-    if (!(precio >= 0) || !(credito >= 0)) {
-      setError("Precio y crédito deben ser números válidos");
+    if (!(precio >= 0)) {
+      setError("Indicá un valor válido");
+      return;
+    }
+    if (!(horas > 0)) {
+      setError("Indicá las horas mensuales del abono");
+      return;
+    }
+    if (!(minSem >= 0)) {
+      setError("El mínimo semanal no es válido");
       return;
     }
     setError(null);
@@ -104,20 +154,25 @@ export function PanelMembresiasView({
           name: planDraft.name.trim(),
           descripcion: planDraft.descripcion.trim() || null,
           precioMensual: precio,
-          creditoMensual: credito,
+          creditoMensual: 0,
+          horasMensuales: horas,
+          horasMinSemanales: minSem,
+          diasPreferidos: planDraft.diasPreferidos,
           diasPeriodo: dias,
           active: true,
         };
         setLocalPlanes((prev) => [...prev, plan]);
         setPlanOpen(false);
-        setOkMsg(`Plan “${plan.name}” creado.`);
+        setOkMsg(`Abono “${plan.name}” creado.`);
         return;
       }
       const res = await createMembresiaPlanAction({
         name: planDraft.name.trim(),
         descripcion: planDraft.descripcion.trim() || null,
         precioMensual: precio.toFixed(2),
-        creditoMensual: credito.toFixed(2),
+        horasMensuales: horas.toFixed(1),
+        horasMinSemanales: minSem.toFixed(1),
+        diasPreferidos: planDraft.diasPreferidos,
         diasPeriodo: dias,
       });
       if (!res.ok) {
@@ -125,14 +180,14 @@ export function PanelMembresiasView({
         return;
       }
       setPlanOpen(false);
-      setOkMsg("Plan creado.");
+      setOkMsg("Abono creado.");
       router.refresh();
     });
   };
 
   const asignar = () => {
     if (!clienteId || !planId) {
-      setError("Elegí cliente y plan");
+      setError("Elegí cliente y abono");
       return;
     }
     setError(null);
@@ -151,16 +206,19 @@ export function PanelMembresiasView({
           clienteNombre: c.nombre,
           clienteTelefono: c.telefono,
           clienteEmail: c.email,
-          creditoFavor: c.creditoFavor + p.creditoMensual,
+          creditoFavor: c.creditoFavor,
           planName: p.name,
           precioMensual: p.precioMensual,
           creditoMensual: p.creditoMensual,
+          horasMensuales: p.horasMensuales,
+          horasMinSemanales: p.horasMinSemanales,
+          diasPreferidos: p.diasPreferidos,
           diasPeriodo: p.diasPeriodo,
         };
         setLocalMems((prev) => [mem, ...prev]);
         setAsignarOpen(false);
         setOkMsg(
-          `Membresía de ${c.nombre}: pagó ${formatPrecio(p.precioMensual)} y recibió ${formatPrecio(p.creditoMensual)} de crédito.`,
+          `Abono de ${c.nombre}: ${formatHoras(p.horasMensuales)}/mes · ${formatPrecio(p.precioMensual)}.`,
         );
         return;
       }
@@ -175,7 +233,7 @@ export function PanelMembresiasView({
         return;
       }
       setAsignarOpen(false);
-      setOkMsg("Membresía asignada y cobrada. El crédito quedó en la ficha del cliente.");
+      setOkMsg("Abono asignado y cobrado. Quedó registrado en caja.");
       router.refresh();
     });
   };
@@ -190,7 +248,6 @@ export function PanelMembresiasView({
             m.id === renovarId
               ? {
                   ...m,
-                  creditoFavor: m.creditoFavor + m.creditoMensual,
                   vigenteHasta: hoy,
                   estado: "activa",
                 }
@@ -210,32 +267,26 @@ export function PanelMembresiasView({
         return;
       }
       setRenovarId(null);
-      setOkMsg("Período cobrado: crédito sumado al cliente.");
+      setOkMsg("Período cobrado y vigencia extendida.");
       router.refresh();
     });
   };
 
   return (
     <PanelPage
-      title="Membresías"
-      description="El cliente paga un monto por período y recibe crédito para ir gastando en turnos."
+      title="Abonos"
+      description="Planes de horas mensuales. Enlazá un cliente a un cupo, con mínimo semanal, valor y días preferidos."
       actions={
         <div className="flex flex-wrap gap-2">
           <PanelButton
             variant="ghost"
             onClick={() => {
               setError(null);
-              setPlanDraft({
-                name: "",
-                descripcion: "",
-                precioMensual: "",
-                creditoMensual: "",
-                diasPeriodo: "30",
-              });
+              setPlanDraft(emptyPlanDraft());
               setPlanOpen(true);
             }}
           >
-            + Plan
+            + Nuevo abono
           </PanelButton>
           <PanelButton
             onClick={() => {
@@ -248,7 +299,7 @@ export function PanelMembresiasView({
             }}
             disabled={planesActivos.length === 0}
           >
-            Asignar membresía
+            Enlazar cliente
           </PanelButton>
         </div>
       }
@@ -260,14 +311,15 @@ export function PanelMembresiasView({
       ) : null}
 
       <section className="mb-8">
-        <h2 className="font-display text-lg tracking-tight">Planes</h2>
+        <h2 className="font-display text-lg tracking-tight">Planes de abono</h2>
         <p className="mt-1 text-sm text-muted">
-          Definí cuánto pagan y cuánto crédito reciben por mes (o período).
+          Definí horas mensuales, mínimo semanal, valor y preferencia de días.
         </p>
         {planes.length === 0 ? (
           <div className="mt-3">
             <PanelEmpty>
-              Creá un plan, por ejemplo: paga $40.000 → recibe $50.000 de crédito.
+              Creá un abono, por ejemplo: 16 h/mes · mín. 4 h/semana · Lu–Vi ·
+              $60.000.
             </PanelEmpty>
           </div>
         ) : (
@@ -292,20 +344,32 @@ export function PanelMembresiasView({
                 </div>
                 <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <dt className="text-xs text-muted">Paga</dt>
+                    <dt className="text-xs text-muted">Horas / mes</dt>
                     <dd className="font-semibold text-ink">
+                      {formatHoras(p.horasMensuales)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted">Valor</dt>
+                    <dd className="font-semibold text-brand">
                       {formatPrecio(p.precioMensual)}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted">Recibe de crédito</dt>
-                    <dd className="font-semibold text-brand">
-                      {formatPrecio(p.creditoMensual)}
+                    <dt className="text-xs text-muted">Mín. semanal</dt>
+                    <dd className="text-ink">
+                      {formatHoras(p.horasMinSemanales)}
                     </dd>
                   </div>
-                  <div className="col-span-2">
+                  <div>
                     <dt className="text-xs text-muted">Período</dt>
                     <dd className="text-ink">{p.diasPeriodo} días</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-xs text-muted">Días preferidos</dt>
+                    <dd className="text-ink">
+                      {formatDiasPreferidos(p.diasPreferidos ?? [])}
+                    </dd>
                   </div>
                 </dl>
                 {!isDemo ? (
@@ -333,15 +397,15 @@ export function PanelMembresiasView({
 
       <section>
         <h2 className="font-display text-lg tracking-tight">
-          Membresías activas
+          Abonos activos
         </h2>
         <p className="mt-1 text-sm text-muted">
-          Al cobrar el período, el crédito se suma al saldo a favor del cliente
-          (se gasta en turnos).
+          Clientes enlazados a un plan. Al cobrar el período se registra en caja
+          y se extiende la vigencia.
         </p>
         {membresias.length === 0 ? (
           <div className="mt-3">
-            <PanelEmpty>Todavía no hay membresías asignadas.</PanelEmpty>
+            <PanelEmpty>Todavía no hay clientes con abono.</PanelEmpty>
           </div>
         ) : (
           <ul className="mt-3 space-y-3">
@@ -360,10 +424,18 @@ export function PanelMembresiasView({
                         {m.clienteEmail ? ` · ${m.clienteEmail}` : ""}
                       </p>
                       <p className="mt-1 text-sm text-muted">
-                        Plan <span className="text-ink">{m.planName}</span>
+                        <span className="text-ink">{m.planName}</span>
+                        {" · "}
+                        {formatHoras(m.horasMensuales)}/mes
+                        {m.horasMinSemanales > 0
+                          ? ` · mín. ${formatHoras(m.horasMinSemanales)}/sem`
+                          : ""}
                         {" · "}
                         {formatFechaYmd(m.vigenteDesde)} →{" "}
                         {formatFechaYmd(m.vigenteHasta)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {formatDiasPreferidos(m.diasPreferidos ?? [])}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -377,14 +449,13 @@ export function PanelMembresiasView({
                         }
                       >
                         {m.estado === "activa" && vencida
-                          ? "Vencida"
-                          : m.estado}
+                          ? "Vencido"
+                          : m.estado === "activa"
+                            ? "Activo"
+                            : m.estado}
                       </PanelBadge>
-                      <span className="text-sm text-muted">
-                        Crédito ficha{" "}
-                        <span className="font-semibold text-brand">
-                          {formatPrecio(m.creditoFavor)}
-                        </span>
+                      <span className="text-sm font-semibold tabular-nums text-brand">
+                        {formatPrecio(m.precioMensual)}
                       </span>
                     </div>
                   </div>
@@ -443,7 +514,7 @@ export function PanelMembresiasView({
       <Modal
         open={planOpen}
         onClose={() => setPlanOpen(false)}
-        title="Nuevo plan"
+        title="Nuevo abono"
         placement="center"
         className="sm:max-w-md!"
         footer={
@@ -462,7 +533,7 @@ export function PanelMembresiasView({
             label="Nombre"
             value={planDraft.name}
             onChange={(v) => setPlanDraft({ ...planDraft, name: v })}
-            placeholder="Membresía mensuales"
+            placeholder="Abono 16 h"
           />
           <Field
             label="Descripción (opcional)"
@@ -472,29 +543,67 @@ export function PanelMembresiasView({
           />
           <div className="grid grid-cols-2 gap-3">
             <Field
-              label="Paga (por período)"
-              value={planDraft.precioMensual}
-              onChange={(v) => setPlanDraft({ ...planDraft, precioMensual: v })}
-              placeholder="40000"
+              label="Horas mensuales"
+              value={planDraft.horasMensuales}
+              onChange={(v) =>
+                setPlanDraft({ ...planDraft, horasMensuales: v })
+              }
+              placeholder="16"
               inputMode="decimal"
             />
             <Field
-              label="Crédito que recibe"
-              value={planDraft.creditoMensual}
+              label="Mín. horas / semana"
+              value={planDraft.horasMinSemanales}
               onChange={(v) =>
-                setPlanDraft({ ...planDraft, creditoMensual: v })
+                setPlanDraft({ ...planDraft, horasMinSemanales: v })
               }
-              placeholder="50000"
+              placeholder="4"
               inputMode="decimal"
             />
           </div>
-          <Field
-            label="Días del período"
-            value={planDraft.diasPeriodo}
-            onChange={(v) => setPlanDraft({ ...planDraft, diasPeriodo: v })}
-            placeholder="30"
-            inputMode="numeric"
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label="Valor (por período)"
+              value={planDraft.precioMensual}
+              onChange={(v) => setPlanDraft({ ...planDraft, precioMensual: v })}
+              placeholder="60000"
+              inputMode="decimal"
+            />
+            <Field
+              label="Días del período"
+              value={planDraft.diasPeriodo}
+              onChange={(v) => setPlanDraft({ ...planDraft, diasPeriodo: v })}
+              placeholder="30"
+              inputMode="numeric"
+            />
+          </div>
+          <div>
+            <p className="mb-1.5 text-sm font-medium text-muted">
+              Días preferidos
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {DIAS_UI.map((d) => {
+                const on = planDraft.diasPreferidos.includes(d.value);
+                return (
+                  <button
+                    key={d.value}
+                    type="button"
+                    onClick={() => toggleDia(d.value)}
+                    className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                      on
+                        ? "border-brand bg-brand/10 text-brand"
+                        : "border-line bg-paper text-muted hover:border-brand/40 hover:text-ink"
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-xs text-muted">
+              Orientativo para agenda; no bloquea otros días.
+            </p>
+          </div>
           {error && planOpen ? (
             <p className="text-sm text-red-600">{error}</p>
           ) : null}
@@ -504,7 +613,7 @@ export function PanelMembresiasView({
       <Modal
         open={asignarOpen}
         onClose={() => setAsignarOpen(false)}
-        title="Asignar membresía"
+        title="Enlazar cliente a un abono"
         placement="center"
         className="sm:max-w-lg!"
         footer={
@@ -512,7 +621,10 @@ export function PanelMembresiasView({
             <PanelButton variant="ghost" onClick={() => setAsignarOpen(false)}>
               Cancelar
             </PanelButton>
-            <PanelButton disabled={pending || !clienteId || !planId} onClick={asignar}>
+            <PanelButton
+              disabled={pending || !clienteId || !planId}
+              onClick={asignar}
+            >
               {pending ? "…" : "Cobrar y activar"}
             </PanelButton>
           </div>
@@ -520,21 +632,21 @@ export function PanelMembresiasView({
       >
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            Se cobra el precio del plan, se suma el crédito a la ficha del
-            cliente y queda registrado en caja.
+            Se cobra el valor del abono, queda registrado en caja y el cliente
+            queda con el cupo de horas del período.
           </p>
           <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-muted">Plan</span>
+            <span className="font-medium text-muted">Abono</span>
             <select
               value={planId}
               onChange={(e) => setPlanId(e.target.value)}
               className="rounded-xl border border-line bg-paper px-3 py-2.5"
             >
-              <option value="">Elegí un plan</option>
+              <option value="">Elegí un abono</option>
               {planesActivos.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} · paga {formatPrecio(p.precioMensual)} → crédito{" "}
-                  {formatPrecio(p.creditoMensual)}
+                  {p.name} · {formatHoras(p.horasMensuales)} ·{" "}
+                  {formatPrecio(p.precioMensual)}
                 </option>
               ))}
             </select>
@@ -610,8 +722,7 @@ export function PanelMembresiasView({
       >
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted">
-            Se cobra el precio del plan, se suma el crédito mensual al cliente y
-            se extiende la vigencia.
+            Se cobra el valor del abono y se extiende la vigencia del período.
           </p>
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-muted">Medio de pago</span>

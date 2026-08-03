@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  getClienteDetalleHandler,
   getClientesHandler,
   patchClienteHandler,
   postClienteCreditoHandler,
@@ -13,6 +14,11 @@ import {
 export const clientesRouter = Router();
 
 clientesRouter.get("/", requireInternalTenant, getClientesHandler);
+clientesRouter.get(
+  "/:clienteId",
+  requireInternalTenant,
+  getClienteDetalleHandler,
+);
 clientesRouter.post(
   "/",
   requireInternalTenant,

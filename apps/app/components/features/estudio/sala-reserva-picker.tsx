@@ -210,6 +210,27 @@ function hayHuecosEntreHoras(horas: string[]): boolean {
   return false;
 }
 
+function minutesToHora(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Completa huecos de 60 min entre la primera y la última hora. */
+function expandirHorasContiguas(horas: string[]): string[] {
+  const sorted = [...new Set(horas)].sort(
+    (a, b) => horaToMinutes(a) - horaToMinutes(b),
+  );
+  if (sorted.length <= 1) return sorted;
+  const out: string[] = [];
+  const from = horaToMinutes(sorted[0]!);
+  const to = horaToMinutes(sorted[sorted.length - 1]!);
+  for (let m = from; m <= to; m += 60) {
+    out.push(minutesToHora(m));
+  }
+  return out;
+}
+
 function rangosHoras(horas: string[]): string[] {
   if (horas.length === 0) return [];
   const sorted = [...horas].sort(
@@ -421,38 +442,43 @@ export function SalaReservaPicker({ sala }: Props) {
     [year, month],
   );
 
-  const total = useMemo(() => {
-    if (
-      ownHold?.precioTotal != null &&
-      ownHold.fecha === fechaKey &&
-      ownHold.horas.length === selectedHoras.length &&
-      [...ownHold.horas].sort().join() === [...selectedHoras].sort().join()
-    ) {
-      return Math.round(ownHold.precioTotal);
-    }
-    return selectedHoras.reduce((sum, h) => {
-      const slot = slots.find((s) => s.hora === h);
-      return sum + (slot?.precio ?? 0);
-    }, 0);
-  }, [selectedHoras, slots, ownHold, fechaKey]);
-
-  const ahorro = useMemo(() => {
-    return selectedHoras.reduce((sum, h) => {
-      const slot = slots.find((s) => s.hora === h);
-      if (!slot?.descuento) return sum;
-      return sum + Math.max(0, slot.precioOriginal - slot.precio);
-    }, 0);
-  }, [selectedHoras, slots]);
-
   const noContinuos = useMemo(
     () => hayHuecosEntreHoras(selectedHoras),
     [selectedHoras],
   );
 
-  const rangosSeleccion = useMemo(
-    () => rangosHoras(selectedHoras),
+  const horasEfectivas = useMemo(
+    () => expandirHorasContiguas(selectedHoras),
     [selectedHoras],
   );
+
+  const rangosSeleccion = useMemo(
+    () => rangosHoras(horasEfectivas),
+    [horasEfectivas],
+  );
+
+  const total = useMemo(() => {
+    if (
+      ownHold?.precioTotal != null &&
+      ownHold.fecha === fechaKey &&
+      ownHold.horas.length === horasEfectivas.length &&
+      [...ownHold.horas].sort().join() === [...horasEfectivas].sort().join()
+    ) {
+      return Math.round(ownHold.precioTotal);
+    }
+    return horasEfectivas.reduce((sum, h) => {
+      const slot = slots.find((s) => s.hora === h);
+      return sum + (slot?.precio ?? 0);
+    }, 0);
+  }, [horasEfectivas, slots, ownHold, fechaKey]);
+
+  const ahorro = useMemo(() => {
+    return horasEfectivas.reduce((sum, h) => {
+      const slot = slots.find((s) => s.hora === h);
+      if (!slot?.descuento) return sum;
+      return sum + Math.max(0, slot.precioOriginal - slot.precio);
+    }, 0);
+  }, [horasEfectivas, slots]);
 
   const canPrevMonth =
     year > today.getFullYear() ||
@@ -534,29 +560,27 @@ export function SalaReservaPicker({ sala }: Props) {
   };
 
   const canContinuar =
-    selectedHoras.length > 0 && !noContinuos && (realSala ? Boolean(ownHold) : true);
+    selectedHoras.length > 0 && (realSala ? Boolean(ownHold) : true);
 
   return (
     <section className="relative rounded-2xl border border-line bg-surface p-4 md:p-6">
-      {holdExpiresAt && selectedHoras.length > 0 && !noContinuos && (
+      {holdExpiresAt && selectedHoras.length > 0 && (
         <div
-          className="absolute right-3 top-3 z-10 flex items-center gap-2.5 rounded-xl border border-brand/40 bg-brand/10 px-2.5 py-1.5 sm:right-4 sm:top-4"
+          className="absolute right-3 top-3 z-10 rounded-xl border border-brand/50 bg-brand/20 px-3 py-2 text-center sm:right-4 sm:top-4"
           role="status"
           aria-live="polite"
-          title="Los demás ven estos horarios en espera hasta que pagues o venza"
+          title="Estos horarios quedan reservados para vos hasta que completes el pago o venza el tiempo"
         >
-          <div className="text-right leading-tight">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted">
-              {connected ? "Para vos" : "Reconectando"}
-            </p>
-          </div>
-          <p className="font-mono text-lg font-semibold tabular-nums leading-none text-brand sm:text-xl">
+          <p className="text-xs font-medium text-white">
+            {connected ? "Tenés para terminar tu reserva" : "Reconectando…"}
+          </p>
+          <p className="mt-1 font-mono text-xl font-semibold tabular-nums leading-none text-brand sm:text-2xl">
             {formatCountdown(holdLeftMs)}
           </p>
         </div>
       )}
 
-      <div className={holdExpiresAt && selectedHoras.length > 0 && !noContinuos ? "pr-[7.5rem]" : undefined}>
+      <div className={holdExpiresAt && selectedHoras.length > 0 ? "pr-[12.5rem]" : undefined}>
         <h2 className="font-[family-name:var(--font-display)] text-xl tracking-tight md:text-2xl">
           Elegí día y horario
         </h2>
@@ -576,7 +600,7 @@ export function SalaReservaPicker({ sala }: Props) {
 
       {holdExpiredMsg && (
         <div
-          className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200"
+          className="mt-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200"
           role="status"
         >
           <p className="min-w-0 flex-1">
@@ -753,51 +777,39 @@ export function SalaReservaPicker({ sala }: Props) {
             })}
           </div>
 
-          {selectedHoras.length > 0 && (
-            <p className="mt-4 text-sm text-muted">
-              {selectedHoras.length} hora{selectedHoras.length === 1 ? "" : "s"}:{" "}
-              <span className="font-medium text-ink">
-                {rangosSeleccion.join(", ")}
-              </span>
-              {" · "}
-              Total{" "}
-              <span className="font-semibold text-brand">{formatPrecio(total)}</span>
-              {ahorro > 0 ? (
-                <>
-                  {" · "}
-                  <span className="inline-flex items-center rounded-full bg-brand/15 px-2.5 py-0.5 text-xs font-semibold text-brand">
-                    Ahorro {formatPrecio(ahorro)}
-                  </span>
-                </>
-              ) : null}
-            </p>
-          )}
-
           {noContinuos && (
             <p
               className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200"
               role="status"
             >
-              Los horarios elegidos no son continuos ({rangosSeleccion.join(" y ")}
-              ). Sumá las horas del medio o sacá las que están separadas para
-              continuar.
+              Hay un hueco entre tus horarios. Para que el turno sea continuo,
+              incluimos las horas del medio ({rangosSeleccion.join(", ")} ·{" "}
+              {formatPrecio(total)}).
             </p>
           )}
 
           <button
             type="button"
             disabled={!canContinuar}
-            onClick={() => setCheckoutOpen(true)}
+            onClick={() => {
+              if (noContinuos) setSelectedHoras(horasEfectivas);
+              setCheckoutOpen(true);
+            }}
             className="mt-4 overflow-visible rounded-xl bg-brand px-4 py-3.5 text-sm font-semibold leading-[1.4] text-paper transition hover:bg-brand-deep disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
           >
             {selectedHoras.length === 0
               ? "Elegí al menos un horario"
-              : noContinuos
-                ? "Horarios no continuos"
-                : realSala && !ownHold
-                  ? "Bloqueando horario…"
-                  : `Continuar · ${selectedHoras.length}h · ${formatPrecio(total)}`}
+              : realSala && !ownHold
+                ? "Bloqueando horario…"
+                : `Continuar · ${rangosSeleccion.join(", ")} · ${formatPrecio(total)}`}
           </button>
+          {selectedHoras.length > 0 && ahorro > 0 ? (
+            <p className="mt-2">
+              <span className="inline-flex items-center rounded-full bg-brand/15 px-2.5 py-0.5 text-xs font-semibold text-brand">
+                Ahorro {formatPrecio(ahorro)}
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -818,7 +830,7 @@ export function SalaReservaPicker({ sala }: Props) {
         sala={sala}
         fecha={fechaKey}
         fechaLabel={labelDia}
-        horas={selectedHoras}
+        horas={horasEfectivas}
         rangos={rangosSeleccion}
         totalSala={total}
         holdExpiresAt={holdExpiresAt}

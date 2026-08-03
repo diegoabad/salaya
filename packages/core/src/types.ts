@@ -72,7 +72,8 @@ export type PoliticaCancelacionInput = {
 
 export type PoliticaDuracion = {
   duracionMinMinutos: number;
-  duracionMaxMinutos: number;
+  /** null = sin tope máximo */
+  duracionMaxMinutos: number | null;
   granularidadMinutos: number;
 };
 

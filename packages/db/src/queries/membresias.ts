@@ -32,7 +32,10 @@ export async function insertMembresiaPlan(
     name: string;
     descripcion?: string | null;
     precioMensual: string;
-    creditoMensual: string;
+    creditoMensual?: string;
+    horasMensuales: string;
+    horasMinSemanales?: string;
+    diasPreferidos?: number[];
     diasPeriodo?: number;
     active?: boolean;
   },
@@ -44,7 +47,10 @@ export async function insertMembresiaPlan(
       name: input.name,
       descripcion: input.descripcion ?? null,
       precioMensual: input.precioMensual,
-      creditoMensual: input.creditoMensual,
+      creditoMensual: input.creditoMensual ?? "0",
+      horasMensuales: input.horasMensuales,
+      horasMinSemanales: input.horasMinSemanales ?? "0",
+      diasPreferidos: input.diasPreferidos ?? [],
       diasPeriodo: input.diasPeriodo ?? 30,
       active: input.active ?? true,
     })
@@ -61,6 +67,9 @@ export async function updateMembresiaPlanRow(
     descripcion: string | null;
     precioMensual: string;
     creditoMensual: string;
+    horasMensuales: string;
+    horasMinSemanales: string;
+    diasPreferidos: number[];
     diasPeriodo: number;
     active: boolean;
   }>,
@@ -73,6 +82,39 @@ export async function updateMembresiaPlanRow(
     )
     .returning();
   return row ?? null;
+}
+
+export async function listMembresiasByCliente(
+  db: Database,
+  tenantId: string,
+  clienteId: string,
+) {
+  return db
+    .select({
+      id: clienteMembresias.id,
+      planId: clienteMembresias.planId,
+      estado: clienteMembresias.estado,
+      vigenteDesde: clienteMembresias.vigenteDesde,
+      vigenteHasta: clienteMembresias.vigenteHasta,
+      planName: membresiaPlanes.name,
+      precioMensual: membresiaPlanes.precioMensual,
+      creditoMensual: membresiaPlanes.creditoMensual,
+      horasMensuales: membresiaPlanes.horasMensuales,
+      horasMinSemanales: membresiaPlanes.horasMinSemanales,
+      diasPreferidos: membresiaPlanes.diasPreferidos,
+    })
+    .from(clienteMembresias)
+    .innerJoin(
+      membresiaPlanes,
+      eq(membresiaPlanes.id, clienteMembresias.planId),
+    )
+    .where(
+      and(
+        eq(clienteMembresias.tenantId, tenantId),
+        eq(clienteMembresias.clienteId, clienteId),
+      ),
+    )
+    .orderBy(desc(clienteMembresias.updatedAt));
 }
 
 export async function listClienteMembresias(
@@ -95,6 +137,9 @@ export async function listClienteMembresias(
       planName: membresiaPlanes.name,
       precioMensual: membresiaPlanes.precioMensual,
       creditoMensual: membresiaPlanes.creditoMensual,
+      horasMensuales: membresiaPlanes.horasMensuales,
+      horasMinSemanales: membresiaPlanes.horasMinSemanales,
+      diasPreferidos: membresiaPlanes.diasPreferidos,
       diasPeriodo: membresiaPlanes.diasPeriodo,
     })
     .from(clienteMembresias)

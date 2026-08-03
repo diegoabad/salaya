@@ -262,7 +262,8 @@ export const politicas = pgTable("politicas", {
     .default("perder"),
   permiteReprogramar: boolean("permite_reprogramar").notNull().default(true),
   duracionMinMinutos: integer("duracion_min_minutos").notNull().default(60),
-  duracionMaxMinutos: integer("duracion_max_minutos").notNull().default(240),
+  /** null = sin tope máximo de reserva */
+  duracionMaxMinutos: integer("duracion_max_minutos"),
   granularidadMinutos: integer("granularidad_minutos").notNull().default(60),
   requiereAprobacionSinSena: boolean("requiere_aprobacion_sin_sena").notNull().default(false),
   ...timestamps,
@@ -356,7 +357,7 @@ export const clientes = pgTable("clientes", {
   index("clientes_tenant_idx").on(t.tenantId),
 ]);
 
-/** Planes de membresía del estudio: paga X / mes → crédito Y para gastar. */
+/** Planes de abono: paga X / período → cupo de horas mensuales (mín. semanal + días preferidos). */
 export const membresiaPlanes = pgTable(
   "membresia_planes",
   {
@@ -370,10 +371,26 @@ export const membresiaPlanes = pgTable(
       precision: 12,
       scale: 2,
     }).notNull(),
+    /** Legacy: crédito $ opcional al cobrar el período (default 0). */
     creditoMensual: numeric("credito_mensual", {
       precision: 12,
       scale: 2,
-    }).notNull(),
+    }).notNull().default("0"),
+    /** Horas de ensayo incluidas en el período */
+    horasMensuales: numeric("horas_mensuales", {
+      precision: 8,
+      scale: 1,
+    }).notNull().default("0"),
+    /** Mínimo orientativo de horas por semana */
+    horasMinSemanales: numeric("horas_min_semanales", {
+      precision: 8,
+      scale: 1,
+    }).notNull().default("0"),
+    /** Días preferidos (0=dom … 6=sáb), JSON array */
+    diasPreferidos: jsonb("dias_preferidos")
+      .$type<number[]>()
+      .notNull()
+      .default([]),
     diasPeriodo: integer("dias_periodo").notNull().default(30),
     active: boolean("active").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
@@ -382,7 +399,7 @@ export const membresiaPlanes = pgTable(
   (t) => [index("membresia_planes_tenant_idx").on(t.tenantId)],
 );
 
-/** Membresía asignada a un cliente (período + estado). */
+/** Abono asignado a un cliente (período + estado). */
 export const clienteMembresias = pgTable(
   "cliente_membresias",
   {

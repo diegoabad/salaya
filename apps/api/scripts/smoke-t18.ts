@@ -75,7 +75,7 @@ async function main() {
   }
   console.log("OK FUERA_DE_HORARIO 08:00");
 
-  // Duración > max (default 240 min = 4h) → 5 horas
+  // Sin tope por defecto → 5h OK
   const dur = await fetch(`${BASE}/public/salas/${sala.id}/holds`, {
     method: "PUT",
     headers: {
@@ -87,15 +87,10 @@ async function main() {
       horas: ["10:00", "11:00", "12:00", "13:00", "14:00"],
     }),
   });
-  if (dur.status !== 400) {
-    throw new Error(`duracion expected 400 got ${dur.status} ${await dur.text()}`);
+  if (!dur.ok) {
+    throw new Error(`duracion 5h expected ok got ${dur.status} ${await dur.text()}`);
   }
-  const durBody = (await dur.json()) as { error?: { code?: string } };
-  if (durBody.error?.code !== "DURACION_INVALIDA") {
-    throw new Error(`duracion code ${durBody.error?.code}`);
-  }
-  console.log("OK DURACION_INVALIDA 5h");
-
+  console.log("OK hold 5h sin tope");
   // Hold válido 2h
   const ok = await fetch(`${BASE}/public/salas/${sala.id}/holds`, {
     method: "PUT",

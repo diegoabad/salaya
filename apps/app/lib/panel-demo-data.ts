@@ -356,7 +356,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       holdMinutos: 5,
       cancelacionVentanaHoras: 24,
       duracionMinMinutos: 60,
-      duracionMaxMinutos: 240,
+      duracionMaxMinutos: null,
       senaModo: "nunca",
       senaTipo: "porcentaje",
       senaValor: "30",
@@ -526,6 +526,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 12,
       ultimaReserva: fecha,
       salaHabitual: a?.name ?? "Sala A",
+      abonoNombre: null,
     },
     {
       id: "c2",
@@ -539,6 +540,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 4,
       ultimaReserva: fecha,
       salaHabitual: b?.name ?? "Sala B",
+      abonoNombre: "Abono 16 h",
     },
     {
       id: "c3",
@@ -552,6 +554,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 7,
       ultimaReserva: fecha,
       salaHabitual: d?.name ?? c?.name ?? "Sala D",
+      abonoNombre: null,
     },
     {
       id: "c4",
@@ -565,6 +568,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 3,
       ultimaReserva: fecha,
       salaHabitual: c?.name ?? "Sala C",
+      abonoNombre: null,
     },
     {
       id: "c5",
@@ -578,6 +582,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 5,
       ultimaReserva: ymdPlus(-3),
       salaHabitual: a?.name ?? "Sala A",
+      abonoNombre: null,
     },
     {
       id: "c6",
@@ -591,6 +596,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 9,
       ultimaReserva: ymdPlus(-1),
       salaHabitual: b?.name ?? "Sala B",
+      abonoNombre: "Abono 24 h",
     },
     {
       id: "c7",
@@ -604,6 +610,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 2,
       ultimaReserva: ymdPlus(-7),
       salaHabitual: null,
+      abonoNombre: null,
     },
     {
       id: "c8",
@@ -617,6 +624,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 6,
       ultimaReserva: ymdPlus(-2),
       salaHabitual: d?.name ?? "Sala D",
+      abonoNombre: null,
     },
     {
       id: "c9",
@@ -630,6 +638,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 8,
       ultimaReserva: ymdPlus(-4),
       salaHabitual: a?.name ?? "Sala A",
+      abonoNombre: null,
     },
     {
       id: "c10",
@@ -643,6 +652,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 1,
       ultimaReserva: ymdPlus(-10),
       salaHabitual: c?.name ?? "Sala C",
+      abonoNombre: null,
     },
     {
       id: "c11",
@@ -656,6 +666,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 11,
       ultimaReserva: ymdPlus(-1),
       salaHabitual: b?.name ?? "Sala B",
+      abonoNombre: null,
     },
     {
       id: "c12",
@@ -669,6 +680,7 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
       reservasCount: 4,
       ultimaReserva: ymdPlus(-14),
       salaHabitual: a?.name ?? "Sala A",
+      abonoNombre: null,
     },
   ];
 
@@ -904,19 +916,25 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
     planes: [
       {
         id: "demo-plan-mensual",
-        name: "Mensual banda",
-        descripcion: "Paga el mes y gastá el crédito en turnos",
-        precioMensual: 40000,
-        creditoMensual: 50000,
+        name: "Abono 16 h",
+        descripcion: "Cupo mensual con mínimo semanal",
+        precioMensual: 60000,
+        creditoMensual: 0,
+        horasMensuales: 16,
+        horasMinSemanales: 4,
+        diasPreferidos: [1, 2, 3, 4, 5],
         diasPeriodo: 30,
         active: true,
       },
       {
         id: "demo-plan-pro",
-        name: "Pro 8h",
-        descripcion: "Más crédito para ensayos largos",
-        precioMensual: 70000,
-        creditoMensual: 90000,
+        name: "Abono 24 h",
+        descripcion: "Más horas para ensayos largos",
+        precioMensual: 85000,
+        creditoMensual: 0,
+        horasMensuales: 24,
+        horasMinSemanales: 6,
+        diasPreferidos: [1, 3, 5],
         diasPeriodo: 30,
         active: true,
       },
@@ -933,9 +951,12 @@ export function buildPanelDemoBundle(estudio: EstudioDetalle) {
         clienteTelefono: cLucrecia.telefono,
         clienteEmail: cLucrecia.email,
         creditoFavor: cLucrecia.creditoFavor,
-        planName: "Mensual banda",
-        precioMensual: 40000,
-        creditoMensual: 50000,
+        planName: "Abono 16 h",
+        precioMensual: 60000,
+        creditoMensual: 0,
+        horasMensuales: 16,
+        horasMinSemanales: 4,
+        diasPreferidos: [1, 2, 3, 4, 5],
         diasPeriodo: 30,
       },
     ],

@@ -3,11 +3,12 @@
 import {
   cargarCreditoClienteAction,
   createClienteAction,
+  fetchClienteDetalle,
   updateClienteAction,
+  type ClienteDetalleDto,
   type ClienteDto,
 } from "@/app/actions/clientes";
 import {
-  PanelBadge,
   PanelButton,
   PanelEmpty,
   PanelPage,
@@ -15,7 +16,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { Modal } from "@/components/ui/modal";
 import { formatPrecio } from "@/lib/directorio-data";
-import { fechaHoyIso } from "@/lib/fechas";
+import { fechaHoyIso, formatFechaYmd } from "@/lib/fechas";
 import { useFilasPorAltura } from "@/lib/use-filas-por-altura";
 import { useRouter } from "next/navigation";
 import {
@@ -26,14 +27,6 @@ import {
   useTransition,
 } from "react";
 
-function formatFechaCorta(iso: string | null) {
-  if (!iso) return "—";
-  return new Intl.DateTimeFormat("es-AR", {
-    day: "numeric",
-    month: "short",
-  }).format(new Date(`${iso}T12:00:00`));
-}
-
 type MedioPago = "efectivo" | "transferencia" | "mercadopago" | "tarjeta";
 
 const MEDIOS: { value: MedioPago; label: string }[] = [
@@ -43,7 +36,111 @@ const MEDIOS: { value: MedioPago; label: string }[] = [
   { value: "tarjeta", label: "Tarjeta" },
 ];
 
+const ESTADO_LABEL: Record<string, string> = {
+  confirmada: "Confirmada",
+  senada: "Señada",
+  pendiente_aprobacion: "Pendiente",
+  completada: "Asistió",
+  ausente: "No vino",
+  cancelada: "Cancelada",
+  vencida: "Vencida",
+};
+
 type Props = { clientes: ClienteDto[]; isDemo?: boolean };
+
+function demoDetalle(c: ClienteDto): ClienteDetalleDto {
+  const now = Date.now();
+  const day = 86_400_000;
+  const reservas = [
+    {
+      id: `${c.id}-r1`,
+      salaId: "s1",
+      salaName: "Sala A",
+      startsAt: new Date(now - 14 * day).toISOString(),
+      endsAt: new Date(now - 14 * day + 3_600_000).toISOString(),
+      estado: "completada",
+      origen: "publico",
+      precioTotal: 12_000,
+      senaMonto: 3_000,
+      senaPagada: true,
+    },
+    {
+      id: `${c.id}-r2`,
+      salaId: "s1",
+      salaName: "Sala A",
+      startsAt: new Date(now - 7 * day).toISOString(),
+      endsAt: new Date(now - 7 * day + 3_600_000).toISOString(),
+      estado: "ausente",
+      origen: "panel",
+      precioTotal: 12_000,
+      senaMonto: 3_000,
+      senaPagada: true,
+    },
+    {
+      id: `${c.id}-r3`,
+      salaId: "s2",
+      salaName: "Sala B",
+      startsAt: new Date(now + 2 * day).toISOString(),
+      endsAt: new Date(now + 2 * day + 3_600_000).toISOString(),
+      estado: "senada",
+      origen: "publico",
+      precioTotal: 14_000,
+      senaMonto: 4_000,
+      senaPagada: true,
+    },
+  ];
+  const hoy = fechaHoyIso();
+  const abonos =
+    c.creditoFavor > 0 || c.reservasCount > 2
+      ? [
+          {
+            id: `${c.id}-ab1`,
+            planId: "p1",
+            planName: "Abono 16 h",
+            estado: "activa",
+            vigenteDesde: hoy.slice(0, 8) + "01",
+            vigenteHasta: hoy,
+            precioMensual: 60_000,
+            creditoMensual: 0,
+            horasMensuales: 16,
+            horasMinSemanales: 4,
+            diasPreferidos: [1, 2, 3, 4, 5],
+          },
+        ]
+      : [];
+  return {
+    id: c.id,
+    nombre: c.nombre,
+    telefono: c.telefono,
+    email: c.email,
+    banda: c.banda,
+    noShowCount: c.noShowCount,
+    creditoFavor: c.creditoFavor,
+    notasInternas: c.notasInternas,
+    stats: {
+      totalReservas: reservas.length,
+      asistio: 1,
+      noVino: 1,
+      canceladas: 0,
+      proximas: 1,
+      noShowCount: c.noShowCount,
+    },
+    abonos,
+    abonosActivos: abonos.filter((a) => a.estado === "activa"),
+    reservas,
+  };
+}
+
+function formatReservaWhen(iso: string) {
+  return new Date(iso).toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export function PanelClientesView({ clientes, isDemo = false }: Props) {
   const router = useRouter();
@@ -51,6 +148,8 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<ClienteDto | null>(null);
+  const [detalle, setDetalle] = useState<ClienteDetalleDto | null>(null);
+  const [detalleLoading, setDetalleLoading] = useState(false);
   const [localClientes, setLocalClientes] = useState(clientes);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +176,7 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
         (c.email?.toLowerCase().includes(needle) ?? false) ||
         (c.banda?.toLowerCase().includes(needle) ?? false) ||
         (c.salaHabitual?.toLowerCase().includes(needle) ?? false) ||
+        (c.abonoNombre?.toLowerCase().includes(needle) ?? false) ||
         c.telefono.replace(/\s/g, "").includes(needle.replace(/\s/g, "")),
     );
   }, [lista, q]);
@@ -113,6 +213,7 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
 
   const openDetalle = (c: ClienteDto) => {
     setSelected(c);
+    setDetalle(null);
     setCreditoMonto("");
     setCreditoMedio("efectivo");
     setCreditoFecha(fechaHoyIso());
@@ -120,6 +221,28 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
     setBandaEdit(c.banda ?? "");
     setEmailEdit(c.email ?? "");
     setError(null);
+    setDetalleLoading(true);
+    start(async () => {
+      if (isDemo) {
+        setDetalle(demoDetalle(c));
+        setDetalleLoading(false);
+        return;
+      }
+      const data = await fetchClienteDetalle(c.id);
+      setDetalle(data);
+      if (data) {
+        setNotasEdit(data.notasInternas ?? "");
+        setBandaEdit(data.banda ?? "");
+        setEmailEdit(data.email ?? "");
+      }
+      setDetalleLoading(false);
+    });
+  };
+
+  const closeDetalle = () => {
+    setSelected(null);
+    setDetalle(null);
+    setDetalleLoading(false);
   };
 
   const patchLocal = (id: string, patch: Partial<ClienteDto>) => {
@@ -141,6 +264,7 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
     start(async () => {
       if (isDemo) {
         patchLocal(selected.id, { creditoFavor: next });
+        setDetalle((d) => (d ? { ...d, creditoFavor: next } : d));
         setCreditoMonto("");
         return;
       }
@@ -155,6 +279,9 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
         return;
       }
       setCreditoMonto("");
+      setDetalle((d) =>
+        d ? { ...d, creditoFavor: Number(res.creditoFavor) } : d,
+      );
       router.refresh();
     });
   };
@@ -169,6 +296,16 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
           banda: bandaEdit.trim() || null,
           email: emailEdit.trim() || null,
         });
+        setDetalle((d) =>
+          d
+            ? {
+                ...d,
+                notasInternas: notasEdit.trim() || null,
+                banda: bandaEdit.trim() || null,
+                email: emailEdit.trim() || null,
+              }
+            : d,
+        );
         return;
       }
       const res = await updateClienteAction({
@@ -184,6 +321,8 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
       router.refresh();
     });
   };
+
+  const abonoLabel = (c: ClienteDto) => c.abonoNombre?.trim() || null;
 
   return (
     <PanelPage
@@ -220,81 +359,62 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
                 Ningún cliente coincide con la búsqueda.
               </p>
             ) : (
-              <table className="w-full min-w-[820px] table-fixed text-left text-sm">
+              <table className="w-full min-w-[560px] table-fixed text-left text-sm">
                 <thead className="bg-surface-2 text-xs uppercase tracking-wide text-muted">
                   <tr>
-                    <th className="w-[22%] px-4 py-3 font-medium">Cliente</th>
-                    <th className="w-[14%] px-4 py-3 font-medium">Teléfono</th>
-                    <th className="w-[18%] px-4 py-3 font-medium">Email</th>
-                    <th className="w-[14%] px-4 py-3 font-medium">
-                      Sala habitual
-                    </th>
-                    <th className="w-[8%] px-4 py-3 font-medium">Reservas</th>
-                    <th className="w-[8%] px-4 py-3 font-medium">No-show</th>
-                    <th className="w-[8%] px-4 py-3 font-medium">Crédito</th>
-                    <th className="w-[8%] px-4 py-3 font-medium">Última</th>
+                    <th className="w-[34%] px-4 py-3 font-medium">Cliente</th>
+                    <th className="w-[22%] px-4 py-3 font-medium">Teléfono</th>
+                    <th className="w-[28%] px-4 py-3 font-medium">Email</th>
+                    <th className="w-[16%] px-4 py-3 font-medium">Abono</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {pageItems.map((c) => (
-                    <tr
-                      key={c.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openDetalle(c)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          openDetalle(c);
-                        }
-                      }}
-                      className="h-[3.25rem] cursor-pointer hover:bg-surface-2/60"
-                    >
-                      <td className="px-4 py-2">
-                        <p className="truncate font-medium text-ink">
-                          {c.nombre}
-                        </p>
-                        {c.banda ? (
-                          <p className="mt-0.5 truncate text-xs text-muted">
-                            {c.banda}
+                  {pageItems.map((c) => {
+                    const abono = abonoLabel(c);
+                    return (
+                      <tr
+                        key={c.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openDetalle(c)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openDetalle(c);
+                          }
+                        }}
+                        className="h-[3.25rem] cursor-pointer hover:bg-surface-2/60"
+                      >
+                        <td className="px-4 py-2">
+                          <p className="truncate font-medium text-ink">
+                            {c.nombre}
                           </p>
-                        ) : c.notasInternas ? (
-                          <p className="mt-0.5 line-clamp-1 text-xs text-muted">
-                            {c.notasInternas}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="truncate px-4 py-2 text-muted">
-                        {c.telefono}
-                      </td>
-                      <td className="truncate px-4 py-2 text-muted">
-                        {c.email ?? "—"}
-                      </td>
-                      <td className="truncate px-4 py-2 text-muted">
-                        {c.salaHabitual ?? "—"}
-                      </td>
-                      <td className="px-4 py-2">{c.reservasCount}</td>
-                      <td className="px-4 py-2">
-                        {c.noShowCount > 0 ? (
-                          <PanelBadge tone="danger">{c.noShowCount}</PanelBadge>
-                        ) : (
-                          <span className="text-muted">0</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        {c.creditoFavor > 0 ? (
-                          <span className="text-brand">
-                            {formatPrecio(c.creditoFavor)}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-muted">
-                        {formatFechaCorta(c.ultimaReserva)}
-                      </td>
-                    </tr>
-                  ))}
+                          {c.banda ? (
+                            <p className="mt-0.5 truncate text-xs text-muted">
+                              {c.banda}
+                            </p>
+                          ) : c.notasInternas ? (
+                            <p className="mt-0.5 line-clamp-1 text-xs text-muted">
+                              {c.notasInternas}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="truncate px-4 py-2 text-muted">
+                          {c.telefono}
+                        </td>
+                        <td className="truncate px-4 py-2 text-muted">
+                          {c.email ?? "—"}
+                        </td>
+                        <td className="px-4 py-2">
+                          {abono ? (
+                            <span className="truncate text-ink">{abono}</span>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -336,49 +456,149 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
 
       <Modal
         open={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onClose={closeDetalle}
         title={selected?.nombre ?? "Cliente"}
         placement="center"
-        className="sm:max-w-lg!"
+        className="sm:max-w-2xl!"
       >
         {selected ? (
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex max-h-[min(78vh,720px)] flex-col gap-4 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <Info label="Teléfono" value={selected.telefono} />
               <Info
                 label="Email"
-                value={selected.email?.trim() ? selected.email : "—"}
-              />
-              <Info
-                label="Sala habitual"
-                value={selected.salaHabitual ?? "—"}
-              />
-              <Info label="Reservas" value={String(selected.reservasCount)} />
-              <Info
-                label="Última reserva"
-                value={formatFechaCorta(selected.ultimaReserva)}
+                value={
+                  (detalle?.email ?? selected.email)?.trim()
+                    ? (detalle?.email ?? selected.email)!
+                    : "—"
+                }
               />
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">
-                  No-show
+                  Saldo abono
                 </p>
-                <div className="mt-1">
-                  {selected.noShowCount > 0 ? (
-                    <PanelBadge tone="danger">{selected.noShowCount}</PanelBadge>
-                  ) : (
-                    <span className="text-ink">0</span>
-                  )}
-                </div>
+                <p className="mt-1 font-semibold tabular-nums text-brand">
+                  {formatPrecio(detalle?.creditoFavor ?? selected.creditoFavor)}
+                </p>
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">
-                  Crédito a favor
+                  No-shows
                 </p>
-                <p className="mt-1 font-semibold tabular-nums text-brand">
-                  {formatPrecio(selected.creditoFavor)}
+                <p className="mt-1 font-semibold tabular-nums text-ink">
+                  {detalle?.stats.noShowCount ?? selected.noShowCount}
                 </p>
               </div>
             </div>
+
+            {detalleLoading ? (
+              <p className="text-sm text-muted">Cargando historial…</p>
+            ) : detalle ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <StatChip label="Reservas" value={detalle.stats.totalReservas} />
+                  <StatChip label="Asistió" value={detalle.stats.asistio} tone="ok" />
+                  <StatChip label="No vino" value={detalle.stats.noVino} tone="warn" />
+                  <StatChip label="Próximas" value={detalle.stats.proximas} />
+                </div>
+
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Abonos
+                  </h3>
+                  {detalle.abonosActivos.length === 0 &&
+                  detalle.creditoFavor <= 0 ? (
+                    <p className="mt-2 text-sm text-muted">
+                      Sin abonos activos ni saldo a favor.
+                    </p>
+                  ) : (
+                    <ul className="mt-2 flex flex-col gap-2">
+                      {detalle.creditoFavor > 0 ? (
+                        <li className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-ink">
+                              Saldo a favor
+                            </span>
+                            <span className="font-semibold tabular-nums text-brand">
+                              {formatPrecio(detalle.creditoFavor)}
+                            </span>
+                          </div>
+                        </li>
+                      ) : null}
+                      {detalle.abonos.map((a) => (
+                        <li
+                          key={a.id}
+                          className="rounded-xl border border-line bg-surface px-3 py-2.5 text-sm"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <p className="font-medium text-ink">{a.planName}</p>
+                              <p className="mt-0.5 text-xs text-muted">
+                                {a.horasMensuales > 0
+                                  ? `${a.horasMensuales} h/mes`
+                                  : null}
+                                {a.horasMinSemanales > 0
+                                  ? ` · mín. ${a.horasMinSemanales} h/sem`
+                                  : ""}
+                                {" · "}
+                                {formatFechaYmd(a.vigenteDesde)} →{" "}
+                                {formatFechaYmd(a.vigenteHasta)}
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                                a.estado === "activa"
+                                  ? "bg-brand/10 text-brand"
+                                  : "bg-surface-2 text-muted"
+                              }`}
+                            >
+                              {a.estado === "activa" ? "Activo" : a.estado}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">
+                    Historial de reservas
+                  </h3>
+                  {detalle.reservas.length === 0 ? (
+                    <p className="mt-2 text-sm text-muted">
+                      Todavía no tiene reservas.
+                    </p>
+                  ) : (
+                    <ul className="mt-2 max-h-56 divide-y divide-line overflow-y-auto rounded-xl border border-line">
+                      {detalle.reservas.map((r) => (
+                        <li
+                          key={r.id}
+                          className="flex flex-wrap items-start justify-between gap-2 px-3 py-2.5 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium text-ink">{r.salaName}</p>
+                            <p className="mt-0.5 text-xs text-muted">
+                              {formatReservaWhen(r.startsAt)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <EstadoBadge estado={r.estado} />
+                            <span className="tabular-nums text-xs text-muted">
+                              {formatPrecio(r.precioTotal)}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </>
+            ) : (
+              <p className="text-sm text-muted">
+                No se pudo cargar el detalle del cliente.
+              </p>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">
@@ -413,7 +633,7 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
 
             <div className="rounded-2xl border border-line bg-surface p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                Cargar crédito
+                Cargar abono
               </p>
               <p className="mt-1 text-xs text-muted">
                 Suma saldo a favor y registra el cobro en caja.
@@ -475,7 +695,7 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
               <PanelButton
                 variant="ghost"
                 disabled={pending}
-                onClick={() => setSelected(null)}
+                onClick={closeDetalle}
               >
                 Cerrar
               </PanelButton>
@@ -510,6 +730,7 @@ export function PanelClientesView({ clientes, isDemo = false }: Props) {
                     reservasCount: 0,
                     ultimaReserva: null,
                     salaHabitual: null,
+                    abonoNombre: null,
                   },
                   ...prev,
                 ]);
@@ -557,6 +778,49 @@ function Info({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-1 truncate text-ink">{value}</p>
     </div>
+  );
+}
+
+function StatChip({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone?: "ok" | "warn";
+}) {
+  const valueClass =
+    tone === "ok"
+      ? "text-emerald-700"
+      : tone === "warn"
+        ? "text-amber-700"
+        : "text-ink";
+  return (
+    <div className="rounded-xl border border-line bg-surface px-3 py-2">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
+        {label}
+      </p>
+      <p className={`mt-0.5 text-lg font-semibold tabular-nums ${valueClass}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function EstadoBadge({ estado }: { estado: string }) {
+  const label = ESTADO_LABEL[estado] ?? estado;
+  let cls = "bg-surface-2 text-muted";
+  if (estado === "completada") cls = "bg-emerald-50 text-emerald-800";
+  else if (estado === "ausente") cls = "bg-amber-50 text-amber-800";
+  else if (estado === "cancelada" || estado === "vencida")
+    cls = "bg-red-50 text-red-700";
+  else if (estado === "confirmada" || estado === "senada")
+    cls = "bg-brand/10 text-brand";
+  return (
+    <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${cls}`}>
+      {label}
+    </span>
   );
 }
 

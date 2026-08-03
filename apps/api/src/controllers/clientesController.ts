@@ -8,6 +8,7 @@ import type { TenantAuthedRequest } from "../middlewares/tenantAuth";
 import {
   cargarCreditoCliente,
   createCliente,
+  getClienteDetalle,
   listClientes,
   updateCliente,
 } from "../services/clientes";
@@ -16,6 +17,13 @@ export async function getClientesHandler(req: Request, res: Response) {
   const { tenantId } = req as TenantAuthedRequest;
   const data = await listClientes(tenantId);
   res.json({ clientes: data });
+}
+
+export async function getClienteDetalleHandler(req: Request, res: Response) {
+  const { tenantId } = req as TenantAuthedRequest;
+  const clienteId = String(req.params.clienteId);
+  const data = await getClienteDetalle(tenantId, clienteId);
+  res.json(data);
 }
 
 export async function postClienteHandler(req: Request, res: Response) {

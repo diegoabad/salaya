@@ -640,10 +640,12 @@ export function EstudioDetalleView({
               </p>
             ) : null}
             <EstudioMap
+              mode="js"
               lat={estudio.lat}
               lng={estudio.lng}
               address={estudio.address}
               name={estudio.name}
+              googlePlaceId={estudio.googlePlaceId}
             />
           </div>
         </Section>

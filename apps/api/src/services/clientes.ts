@@ -4,6 +4,8 @@ import {
   getClienteById,
   insertCliente,
   listClientesConStats,
+  listMembresiasByCliente,
+  listReservasByCliente,
   updateClienteRow,
 } from "@repo/db/queries";
 import type {
@@ -27,6 +29,7 @@ function mapCliente(row: Awaited<ReturnType<typeof listClientesConStats>>[number
     reservasCount: Number(row.reservasCount ?? 0),
     ultimaReserva: row.ultimaReserva,
     salaHabitual: row.salaHabitual,
+    abonoNombre: row.abonoNombre,
   };
 }
 
@@ -53,6 +56,7 @@ export async function createCliente(
       reservasCount: 0,
       ultimaReserva: null as string | null,
       salaHabitual: null as string | null,
+      abonoNombre: null as string | null,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "";
@@ -117,8 +121,8 @@ export async function cargarCreditoCliente(
 
   const nota = input.nota?.trim();
   const descripcion = nota
-    ? `Crédito a favor — ${existing.nombre} · ${nota}`
-    : `Crédito a favor — ${existing.nombre}`;
+    ? `Abono a favor — ${existing.nombre} · ${nota}`
+    : `Abono a favor — ${existing.nombre}`;
 
   try {
     const mov = await createMovimientoCaja(tenantId, {
@@ -146,3 +150,75 @@ export async function cargarCreditoCliente(
     throw err;
   }
 }
+
+export async function getClienteDetalle(tenantId: string, clienteId: string) {
+  const db = getDb();
+  const existing = await getClienteById(db, tenantId, clienteId);
+  if (!existing) throw new HttpError(404, "NOT_FOUND", "Cliente no encontrado");
+
+  const [reservasRows, membresiasRows] = await Promise.all([
+    listReservasByCliente(db, tenantId, clienteId, 50),
+    listMembresiasByCliente(db, tenantId, clienteId),
+  ]);
+
+  const reservas = reservasRows.map((r) => ({
+    id: r.id,
+    salaId: r.salaId,
+    salaName: r.salaName,
+    startsAt: r.startsAt.toISOString(),
+    endsAt: r.endsAt.toISOString(),
+    estado: r.estado,
+    origen: r.origen,
+    precioTotal: Number(r.precioTotal),
+    senaMonto: Number(r.senaMonto),
+    senaPagada: r.senaPagada,
+  }));
+
+  const asistio = reservas.filter((r) => r.estado === "completada").length;
+  const noVino = reservas.filter((r) => r.estado === "ausente").length;
+  const canceladas = reservas.filter((r) => r.estado === "cancelada").length;
+  const proximas = reservas.filter((r) =>
+    ["confirmada", "senada", "pendiente_aprobacion"].includes(r.estado),
+  ).length;
+
+  const abonos = membresiasRows.map((m) => ({
+    id: m.id,
+    planId: m.planId,
+    planName: m.planName,
+    estado: m.estado,
+    vigenteDesde: m.vigenteDesde,
+    vigenteHasta: m.vigenteHasta,
+    precioMensual: Number(m.precioMensual),
+    creditoMensual: Number(m.creditoMensual),
+    horasMensuales: Number(m.horasMensuales ?? 0),
+    horasMinSemanales: Number(m.horasMinSemanales ?? 0),
+    diasPreferidos: Array.isArray(m.diasPreferidos)
+      ? (m.diasPreferidos as number[])
+      : [],
+  }));
+
+  const abonosActivos = abonos.filter((a) => a.estado === "activa");
+
+  return {
+    id: existing.id,
+    nombre: existing.nombre,
+    telefono: existing.telefono,
+    email: existing.email,
+    banda: existing.banda,
+    noShowCount: existing.noShowCount,
+    creditoFavor: Number(existing.creditoFavor),
+    notasInternas: existing.notasInternas,
+    stats: {
+      totalReservas: reservas.length,
+      asistio,
+      noVino,
+      canceladas,
+      proximas,
+      noShowCount: existing.noShowCount,
+    },
+    abonos,
+    abonosActivos,
+    reservas,
+  };
+}
+

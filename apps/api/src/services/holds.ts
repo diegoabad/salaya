@@ -163,23 +163,28 @@ function horaToMinutes(hora: string) {
   return h! * 60 + m!;
 }
 
-function assertContiguous(horas: string[]) {
+function minutesToHora(mins: number) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Ordena y completa huecos de 60 min entre la primera y la última hora. */
+function normalizeHorasContiguas(horas: string[]) {
   const sorted = [...new Set(horas)].sort(
     (a, b) => horaToMinutes(a) - horaToMinutes(b),
   );
   if (sorted.length === 0) {
     throw new HttpError(400, "HOLD_EMPTY", "Elegí al menos un horario");
   }
-  for (let i = 1; i < sorted.length; i++) {
-    if (horaToMinutes(sorted[i]!) - horaToMinutes(sorted[i - 1]!) !== 60) {
-      throw new HttpError(
-        400,
-        "HOLD_NOT_CONTIGUOUS",
-        "Los horarios del hold deben ser continuos",
-      );
-    }
+  if (sorted.length === 1) return sorted;
+  const out: string[] = [];
+  const from = horaToMinutes(sorted[0]!);
+  const to = horaToMinutes(sorted[sorted.length - 1]!);
+  for (let m = from; m <= to; m += 60) {
+    out.push(minutesToHora(m));
   }
-  return sorted;
+  return out;
 }
 
 /** fecha YYYY-MM-DD + HH:MM (hora AR) → UTC Date — ver arLocalToUtc */
@@ -491,7 +496,7 @@ export async function upsertHold(input: {
   adicionales?: HoldAdicionalInput[];
 }): Promise<HoldPublic> {
   await tickExpiredHolds();
-  const horas = assertContiguous(input.horas);
+  const horas = normalizeHorasContiguas(input.horas);
   const { sala, holdMinutos } = await resolveSala(input.salaId);
   const db = getDb();
   const now = new Date();

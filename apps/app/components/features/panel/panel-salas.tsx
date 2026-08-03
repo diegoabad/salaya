@@ -343,6 +343,9 @@ function SalaForm({
   const [ancho, setAncho] = useState(sala?.anchoMetros ?? "");
   const [largo, setLargo] = useState(sala?.largoMetros ?? "");
   const [acustica, setAcustica] = useState(sala?.acustica ?? "");
+  const [duracionMax, setDuracionMax] = useState(
+    sala?.duracionMaxMinutos != null ? String(sala.duracionMaxMinutos) : "",
+  );
   const [tags, setTags] = useState(sala?.tags ?? []);
   const [caracteristicas, setCaracteristicas] = useState(
     sala?.caracteristicas ?? [],
@@ -580,6 +583,15 @@ function SalaForm({
             value={acustica}
             onChange={setAcustica}
             placeholder="Profesional / tratada"
+          />
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <FieldCtrl
+            label="Duración máx (min)"
+            name="duracionMaxMinutos"
+            value={duracionMax}
+            onChange={setDuracionMax}
+            placeholder="Vacío = hereda sede / sin tope"
           />
         </div>
         <label className="mt-4 flex flex-col gap-1">

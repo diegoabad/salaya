@@ -16,6 +16,57 @@ export type ClienteDto = {
   ultimaReserva: string | null;
   /** Sala con más reservas (no canceladas), si hay */
   salaHabitual: string | null;
+  /** Nombre del abono activo, si tiene */
+  abonoNombre: string | null;
+};
+
+export type ClienteReservaDto = {
+  id: string;
+  salaId: string;
+  salaName: string;
+  startsAt: string;
+  endsAt: string;
+  estado: string;
+  origen: string;
+  precioTotal: number;
+  senaMonto: number;
+  senaPagada: boolean;
+};
+
+export type ClienteAbonoDto = {
+  id: string;
+  planId: string;
+  planName: string;
+  estado: string;
+  vigenteDesde: string;
+  vigenteHasta: string;
+  precioMensual: number;
+  creditoMensual: number;
+  horasMensuales: number;
+  horasMinSemanales: number;
+  diasPreferidos: number[];
+};
+
+export type ClienteDetalleDto = {
+  id: string;
+  nombre: string;
+  telefono: string;
+  email: string | null;
+  banda: string | null;
+  noShowCount: number;
+  creditoFavor: number;
+  notasInternas: string | null;
+  stats: {
+    totalReservas: number;
+    asistio: number;
+    noVino: number;
+    canceladas: number;
+    proximas: number;
+    noShowCount: number;
+  };
+  abonos: ClienteAbonoDto[];
+  abonosActivos: ClienteAbonoDto[];
+  reservas: ClienteReservaDto[];
 };
 
 function revalidateClientes() {
@@ -26,6 +77,13 @@ function revalidateClientes() {
 export async function fetchClientes() {
   const res = await panelApiFetch<{ clientes: ClienteDto[] }>("/clientes");
   return res.ok ? res.data.clientes : null;
+}
+
+export async function fetchClienteDetalle(
+  clienteId: string,
+): Promise<ClienteDetalleDto | null> {
+  const res = await panelApiFetch<ClienteDetalleDto>(`/clientes/${clienteId}`);
+  return res.ok ? res.data : null;
 }
 
 export async function createClienteAction(input: {
@@ -62,7 +120,7 @@ export async function updateClienteAction(input: {
   return { ok: true };
 }
 
-/** Carga crédito a favor + ingreso en caja (medio + día del cobro). */
+/** Carga abono (saldo a favor) + ingreso en caja (medio + día del cobro). */
 export async function cargarCreditoClienteAction(input: {
   clienteId: string;
   monto: string;

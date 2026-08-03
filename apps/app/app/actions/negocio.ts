@@ -37,7 +37,7 @@ export type NegocioDto = {
     holdMinutos: number;
     cancelacionVentanaHoras: number;
     duracionMinMinutos: number;
-    duracionMaxMinutos: number;
+    duracionMaxMinutos: number | null;
     senaModo: string;
     senaTipo: string;
     senaValor: string;
@@ -121,7 +121,11 @@ export async function updateNegocioAction(
       formData.get("cancelacionVentanaHoras") || 24,
     ),
     duracionMinMinutos: Number(formData.get("duracionMinMinutos") || 60),
-    duracionMaxMinutos: Number(formData.get("duracionMaxMinutos") || 240),
+    duracionMaxMinutos: (() => {
+      const raw = String(formData.get("duracionMaxMinutos") ?? "").trim();
+      if (!raw) return null;
+      return Number(raw);
+    })(),
     senaModo: String(formData.get("senaModo") || "siempre"),
     senaTipo: String(formData.get("senaTipo") || "porcentaje"),
     senaValor: String(formData.get("senaValor") || "30"),
